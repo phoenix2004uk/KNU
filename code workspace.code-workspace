@@ -1,0 +1,28 @@
+{
+	"folders": [
+		{
+			"path": "boot"
+		},
+		{
+			"path": "libs"
+		},
+		{
+			"path": "missions"
+		},
+		{
+			"path": "knulib"
+		},
+		{
+			"path": "knulib-raw"
+		}
+	],
+	"settings": {
+		"editor.insertSpaces": false,
+		"editor.detectIndentation": false,
+		"editor.tabSize": 4,
+		"editor.trimAutoWhitespace": true,
+		"files.trimTrailingWhitespace": true,
+		"files.eol": "\n",
+		"editor.wordWrap": "on"
+	}
+}

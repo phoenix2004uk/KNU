@@ -1,0 +1,1 @@
+{export(Lex("version","1.0.0","CallbackIterator",{PARAMETER A,B.UNTIL NOT A:NEXT B(A:VALUE,A:INDEX).},"PatternFilterIterator",{PARAMETER A,B,D.LOCAL F IS{PARAMETER H,J,K,L.IF K:MATCHESPATTERN(H)J(K,L).}.A(F:bind(B):bind(D)).},"TypeFilterIterator",{PARAMETER A,B,D.LOCAL F IS{PARAMETER H,J,K,L.IF item:ISTYPE(H)J(K,L).}.A(F:bind(B):bind(D)).})).}

@@ -1,0 +1,1 @@
+{DELETEPATH("1:/mission/").LOCAL A IS GetCallsign().LOCAL B IS"/KSC/"+A+"/".IF EXISTS("0:/"+B){LOCAL D IS OPEN("0:/"+B).IF D:LIST:LENGTH>0{LOCAL F IS D:LIST:VALUES[0]:NAME. IF NOT download(F,B)KnuPanic(F,"download").MOVEPATH("1:/home/"+F,"1:/mission/main.ks").MOVEPATH("0:"+B+F,"0:/KSC/Archived/"+A+"/"+F).}}export(Lex("version","1.1.0")).}

@@ -1,0 +1,6 @@
+wait some time
+enable vernier engines
+fire down until aiming backwards
+adjust left or right until facing retrograde
+fire engine until periapsis < 20000
+land?

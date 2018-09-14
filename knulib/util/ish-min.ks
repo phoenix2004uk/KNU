@@ -1,0 +1,1 @@
+{export(Lex("version","1.0.3","value",{PARAMETER A,B,D.RETURN A>B-D AND A<B+D.},"factor",{PARAMETER A,B,D.RETURN A>B*D AND A<B*(2-D).})).}

@@ -1,0 +1,28 @@
+
+// root@1:Vessel
+//  /boot						bootstrap, knuldr
+//	/lib						libraries
+//	/home						mission data
+//    /mission.ks				mission start script
+//    /run.{runlevel}.ks		runlevel based mission components
+//  /run.ks						runlevel
+
+// root@0:Archive
+//  /boot						bootstrap, knuldr, system updates
+//  /knulib						knu-libraries
+//	/missions					mission repository
+//    -{callsign}.ks			script for single specific simple missions
+//
+//	  /{missionName}			mission group folder
+//      -main.ks				main script for a series of (repeatable) missions
+//      -{callsign}.ks			script for a single mission
+//	    /{callsign}				scripts for each vessel
+//        -main.ks				main script
+//        -runmodes.ks			named variables for each runmode
+//        -run.{runlevel}.ks	script for the current runlevel
+
+// look for one of the following
+//   0:/missions/{vesselCallsign}.ks						=> download {vesselCallsign}.ks
+//   0:/missions/{missionName}/main.ks						=> download {missionName}/* (no subfolders)
+//   0:/missions/{missionName}/{vesselCallsign}.ks			=> download {missionName}/{vesselCallsign}.ks
+//   0:/missions/{missionName}/{vesselCallsign}/main.ks		=> download {missionName}/{vesselCallsign}/* (with subfolders)

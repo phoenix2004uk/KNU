@@ -1,0 +1,112 @@
+give HasKSCConnection() an optional parameter DIRECT to check if the connection is a relay or direct connection to ksc
+
+boot file
+
+needs to have a default ship orientation
+staged mission files to reduce overhead for large missions
+
+
+
+
+if (PeA > 15000) OR (ALT > 70000)
+ drop last ascent stage
+
+
+if stageN has control fins
+ disable fin roll control
+ disable engine gimble
+
+when altitude > 30000 (maybe use atmospheres or pressure)
+ restore engine gimble state
+
+when docking
+ if not special rcs setup
+  if vessel has reaction wheels (with high torque?)
+  then disable rcs rotation controls
+
+special rcs setup is
+ separate rcs for translation and rotation (rotation would have a [much] lower thrust)
+ this can be setup with tags on rcs parts. no [specific] tags means no special setup
+
+
+// use cross product to find normal to the orbit plane.
+SET norm to VCRS(velocity:orbit, ship:body:position).
+
+launch parameters
+:profile					// the ascent profile
+:target apoapsis			// the target apoapsis to end ascent
+:stage drop min altitude	// if both set, drop ascent stage when periapsis
+:stage drop max altitude	// is between these altitudes
+:discard fairing altitude	// altitude to discard fairings - maybe use tags
+:gimble altitude			// target altitude to restore engine gimble state
+:target inclination			// target inclination of final orbit
+							// can be used with launch time for ascent-to-rendezvous
+:launch time				// time to start launch
+							// can be calculated off estimated "time to orbit"
+							// for rendezvous
+
+insertion parameters
+:target apoapsis
+:target periapsis			// set either target sma, period or periapsis
+:target sma
+:target period
+
+deorbit parameters
+:target periapsis			// how far into the atmosphere to drop periapsis
+:max parachte altitude		// speed and altitude or pressure at which to deploy parachutes
+:max parachte pressure		// these can be omitted if using realchute mod
+:max parachute speed
+
+
+LOCK relativeVelocity TO target:VELOCITY:ORBIT - SHIP:VELOCITY:ORBIT
+// target position relative to ship position, R = V(10, 0, 10)
+// ship prograde direction, P = V(0, 0, 0)
+// steering direction, D = 2* (R-P) = V(20, 0, 20)
+LOCK STEERING TO 2 * (target:POSITION - relativeVelocity).
+
+LOCK targetRetrograde TO target:VELOCITY:ORBIT - SHIP:VELOCITY:ORBIT
+
+when port acquired - stop translating
+
+TGT => V(0, 0, 1)
+RVEL => V(0, 0, 5)
+RVEL - TGT => V(0, 0, 4)
+
+RVEL + (RVEL - TGT) => V(0, 0, 9)
+2*RVEL + TGT
+
+
+FUNCTION TARGET_PROGRADE {
+	RETURN TARGET:DIRECTION:VECTOR.
+}
+
+FUNCTION TARGET_RVEL {
+	RETURN TARGET:VELOCITY:ORBIT - SHIP:VELOCITY:ORBIT.
+}
+
+FUNCTION RELATIVE_DIRECTION {
+
+	LOCAL theta IS VANG(TARGET_RVEL(),TARGET_PROGRADE()).
+	IF theta > 90.1 RETURN 1.
+	ELSE IF theta < 90.1 RETURN -1.
+	RETURN 0.
+
+}
+
+
+CLEARSCREEN.
+
+
+LOCK RELATIVE_VELOCITY TO TARGET_RVEL():MAG.
+
+LOCK STEERING TO 2*TARGET_RVEL() + ((-RELATIVE_DIRECTION()) * TARGET_PROGRADE()) + R(0,0,0).
+
+UNTIL 0 {
+
+	PRINT VANG(TARGET_RVEL(),TARGET_PROGRADE()) AT (0,0).
+
+	PRINT RELATIVE_DIRECTION() + "  " AT (0, 1).
+
+	WAIT 0.1.
+
+}

@@ -1,0 +1,84 @@
+FUNCTION NORMALVEC {RETURN VCRS(SHIP:VELOCITY:ORBIT,BODY:POSITION).}
+FUNCTION RADIALVEC {RETURN VCRS(SHIP:VELOCITY:ORBIT,NORMALVEC()).}
+FUNCTION FnCb {PARAMETER c,w IS 0.01. IF c:ISTYPE("Delegate") c(). WAIT w.}
+FUNCTION CorrectInc {
+	PARAMETER incMin,incMax,tMax IS 0.5,f IS FALSE.
+	LOCAL inc IS SHIP:OBT:INCLINATION.
+	IF inc>=incMin AND inc<=incMax RETURN FALSE.
+	NotifyInfo("Correcting Inclination").
+	LOCAL dir IS 1.
+	LOCAL vNorm IS NORMALVEC().
+	WAIT UNTIL ABS(SHIP:LATITUDE)<10.
+	IF SHIP:LATITUDE>0 { IF inc<incMin LOCK STEERING TO vNorm. ELSE {LOCK STEERING TO -1*vNorm. SET dir TO -1. }}
+	ELSE { IF inc<incMin LOCK STEERING TO -1*vNorm. ELSE {LOCK STEERING TO vNorm. SET dir TO -1. }}
+	WAIT UNTIL ABS(SHIP:LATITUDE)<1.
+	LOCK THROTTLE TO tMax.
+	UNTIL (dir=1 AND SHIP:OBT:INCLINATION>incMin) OR (dir=-1 AND SHIP:OBT:INCLINATION<incMax) FnCb(f).
+	LOCK THROTTLE TO 0.
+	FnCb(f).
+	RETURN TRUE.
+}
+FUNCTION CorrectAp {
+	PARAMETER apMin,apMax,tMax IS 0.5,f IS FALSE.
+	LOCAL ap IS ALT:APOAPSIS.
+	IF ap>=apMin AND ap<=apMax RETURN FALSE.
+	NotifyInfo("Correcting Apoapsis").
+	WarpFor(ETA:PERIAPSIS-30).
+	LOCAL dir IS 1.
+	IF ap<apMin LOCK STEERING TO PROGRADE.
+	ELSE {LOCK STEERING TO RETROGRADE. SET dir TO -1.}
+	WAIT UNTIL ETA:PERIAPSIS<10.
+	LOCK THROTTLE TO tMax.
+	UNTIL (dir=1 AND ALT:APOAPSIS>apMin) OR (dir=-1 AND ALT:APOAPSIS<apMax) FnCb(f).
+	LOCK THROTTLE TO 0.
+	FnCb(f).
+	RETURN TRUE.
+}
+FUNCTION CorrectEcc {
+	PARAMETER eccMin,eccMax,cMode IS 1,tMax IS 0.5,f IS FALSE.
+	LOCAL eccMin IS ABS(eccMin).
+	LOCAL eccMax IS ABS(eccMax).
+	LOCAL ecc IS SHIP:OBT:ECCENTRICITY.
+	IF ecc>=eccMin AND ecc<=eccMax RETURN FALSE.
+	NotifyInfo("Correcting Eccentricity").
+	LOCK tN TO ETA:PERIAPSIS.
+	IF cMode=1 LOCK tN TO ETA:APOAPSIS.
+	WarpFor(tN-30).
+	LOCAL dir IS 1.
+	IF ecc<eccMin LOCK STEERING TO cMode*RETROGRADE:VECTOR.
+	ELSE {LOCK STEERING TO cMode*PROGRADE:VECTOR. SET dir TO -1.}
+	WAIT UNTIL tN<10.
+	LOCK THROTTLE TO tMax.
+	UNTIL (dir=1 AND SHIP:OBT:ECCENTRICITY>eccMin) OR (dir=-1 AND SHIP:OBT:ECCENTRICITY<eccMax) FnCb(f).
+	LOCK THROTTLE TO 0.
+	FnCb(f).
+	RETURN TRUE.
+}
+FUNCTION CorrectSMA {
+	PARAMETER smaMin,smaMax,cMode IS 1,tMax IS 0.5,f IS FALSE.
+	LOCAL sma IS SHIP:OBT:SEMIMAJORAXIS.
+	IF sma>=smaMin AND sma<=smaMax RETURN FALSE.
+	NotifyInfo("Correcting SMA").
+	LOCK tN TO ETA:PERIAPSIS.
+	IF cMode=1 LOCK tN TO ETA:APOAPSIS.
+	WarpFor(tN-30).
+	LOCAL dir IS 1.
+	IF sma<smaMin LOCK STEERING TO cMode*PROGRADE:VECTOR.
+	ELSE {LOCK STEERING TO cMode*RETROGRADE:VECTOR. SET dir TO -1.}
+	WAIT UNTIL tN<10.
+	LOCK THROTTLE TO tMax.
+	UNTIL (dir=1 AND SHIP:OBT:SEMIMAJORAXIS>smaMin) OR (dir=-1 AND SHIP:OBT:SEMIMAJORAXIS<smaMax) FnCb(f).
+	LOCK THROTTLE TO 0.
+	FnCb(f).
+	RETURN TRUE.
+}
+FUNCTION PerformCorrections {
+	PARAMETER oc,tMAX IS 0.5,loops IS 2,f1 IS FALSE,f2 IS FALSE.
+	LOCAL done IS TRUE.
+	LOCAL c1 IS Lexicon("inc",CorrectInc@,"Ap",CorrectAp@).
+	LOCAL c2 IS Lexicon("ecc",CorrectEcc@,"sma",CorrectSMA@).
+	UNTIL done=FALSE OR loops=0 { SET done TO FALSE. SET loops TO loops-1.
+		FOR op IN c1:KEYS IF oc:HasKey(op) IF c1[op](oc[op][0],oc[op][1],tMAX,f1) {SET done TO TRUE. FnCb(f2).}
+		FOR op IN c2:KEYS IF oc:HasKey(op) IF c2[op](oc[op][0],oc[op][1],1,tMAX,f1) {SET done TO TRUE. FnCb(f2).}
+	}
+}

@@ -1,0 +1,26 @@
+
+SET SCI_EXP["sensorAtmosphere"] TO "Run Atmosphere Analysis"
+SET SCI_EXP["GooExperiment"] TO "observe mystery goo"
+SET SCI_EXP["science_module"] TO "Observe Materials Bay"
+SET SCI_EXP["sensorAccelerometer"] TO "Log Seismic Data"
+SET SCI_EXP["sensorBarometer"] TO "Log Pressure Data"
+SET SCI_EXP["sensorGravimeter"] TO "Log Gravity Data"
+
+
+// infraredTelescope => SENTINEL Infrared Telescope => special case
+// surfaceSample?
+// ignore crewReport
+// ignore evaReport
+
+SCIENCE DATA
+PART					NAME				DATA	SCALE	ACTION
+sensorThermometer		temperatureScan		8		1.0		Log Temperature
+sensorBarometer			barometerScan		12		1.0		Log Pressure Data
+sensorAccelerometer		seismicScan			20		2.5		Log Seismic Data
+
+ANTENNA DATA
+NAME				packetCost		packetSize		packetInterval
+Reflectron DP-10	15				2				0.3
+	temperatureScan:	1.0*8/2=4 packets => 60EC, 1.2s
+	barometerScan:		1.0*12/2=6 packets => 60EC, 1.8s
+	seismicScan:		2.5*20/2=25 packets => 375EC 7.5s
