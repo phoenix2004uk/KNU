@@ -1,0 +1,82 @@
+
+function true_anomaly {
+	LOCAL true_anomaly_deg IS SHIP:OBT:TRUEANOMALY.
+	RETURN List(true_anomaly_deg, true_anomaly_deg * CONSTANT:DegToRad).
+}
+function true_anomaly_nodes {
+	LOCAL V1 IS 180 - SHIP:OBT:ARGUMENTOFPERIAPSIS.
+	LOCAL V2 IS 360 - SHIP:OBT:ARGUMENTOFPERIAPSIS.
+	RETURN List(List(V1, V1 * CONSTANT:DegToRad), List(V2, V2 * CONSTANT:DegToRad)).
+}
+function eccentric_anomaly {
+	PARAMETER true_anomaly_deg.
+	LOCAL eccentric_anomaly_deg IS ARCCOS( (SHIP:OBT:ECCENTRICITY+COS(true_anomaly_deg)) / (1 + SHIP:OBT:ECCENTRICITY*COS(true_anomaly_deg)) ).
+	IF true_anomaly_deg > 180 {
+		SET eccentric_anomaly_deg TO 360 - eccentric_anomaly_deg.
+	}
+	RETURN List(eccentric_anomaly_deg, eccentric_anomaly_deg * CONSTANT:DegToRad).
+}
+function mean_anomaly {
+	PARAMETER eccentric_anomaly_deg.
+	LOCAL eccentric_anomaly_rad IS eccentric_anomaly_deg * CONSTANT:DegToRad.
+	LOCAL mean_anomaly_rad IS eccentric_anomaly_rad - SHIP:OBT:ECCENTRICITY*SIN(eccentric_anomaly_deg).
+	RETURN List(mean_anomaly_rad * CONSTANT:RadToDeg, mean_anomaly_rad).
+}
+function mean_motion {
+	LOCAL mean_motion_rad IS SQRT( BODY:MU / (SHIP:OBT:SEMIMAJORAXIS^3) ).
+	RETURN LIST(mean_motion_rad * CONSTANT:RadToDeg, mean_motion_rad).
+}
+function get_time {
+	PARAMETER secs.
+	SET secs TO ABS(secs).
+	LOCAL days IS FLOOR(secs / 21600).
+	SET secs TO secs - days*21600.
+	LOCAL hrs IS FLOOR(secs / 3600).
+	SET secs TO secs - hrs*3600.
+	LOCAL mins IS FLOOR(secs / 60).
+	SET secs TO ROUND(secs - mins*60,2).
+	RETURN days+"d "+hrs+"h "+mins+"m "+secs+"s".
+}
+
+function calc3 {
+	LOCAL V0 IS true_anomaly().
+	LOCAL E0 IS eccentric_anomaly(V0[0]).
+	LOCAL M0 IS mean_anomaly(E0[0]).
+
+	LOCAL VNodes IS true_anomaly_nodes().
+	LOCAL V1 IS VNodes[0].
+	LOCAL V2 IS VNodes[1].
+	LOCAL VN IS V1.
+	IF V0[0] > 90 AND V0[0] <= 270 SET VN TO V2.
+
+	LOCAL E1 IS eccentric_anomaly(V1[0]).
+	LOCAL E2 IS eccentric_anomaly(V2[0]).
+
+	LOCAL M1 IS mean_anomaly(E1[0]).
+	LOCAL M2 IS mean_anomaly(E2[0]).
+
+	LOCAL n IS mean_motion().
+
+	LOCAL t1 IS (M1[1]-M0[1]) / n[1].
+	IF t1 < 0 SET t1 TO t1 + SHIP:OBT:PERIOD.
+	LOCAL t2 IS (M2[1]-M0[1]) / n[1].
+	IF t2 < 0 SET t2 TO t2 + SHIP:OBT:PERIOD.
+
+	PRINT "Mean Motion:           "+ROUND(n[0],4).
+	PRINT "True Anomaly:          "+ROUND(V0[0],4).
+	PRINT "Eccentric Anomaly:     "+ROUND(E0[0],4).
+	PRINT "Mean Anomaly:          "+ROUND(M0[0],4).
+	PRINT "-----------------------------------".
+	PRINT "True Anomaly N1:       "+ROUND(V1[0],4).
+	PRINT "Mean Anomaly N1:       "+ROUND(E1[0],4).
+	PRINT "Eccentric Anomaly N1:  "+ROUND(M1[0],4).
+	PRINT "Time to N1:            "+ROUND(t1,2).
+	PRINT "                       "+get_time(t1).
+	PRINT "-----------------------------------".
+	PRINT "True Anomaly N2:       "+ROUND(V2[0],4).
+	PRINT "Mean Anomaly N2:       "+ROUND(E2[0],4).
+	PRINT "Eccentric Anomaly N2:  "+ROUND(M2[0],4).
+	PRINT "Time to N2:            "+ROUND(t2,2).
+	PRINT "                       "+get_time(t2).
+	PRINT "-----------------------------------".
+}
