@@ -1,4 +1,5 @@
 local MNV is import("maneuver").
+LOCAL partLib IS import("util/parts").
 FUNCTION CalcSMA {
 	PARAMETER Ap,Pe,R IS BODY:RADIUS.
 	RETURN (Pe+Ap)/2+R.
@@ -31,28 +32,24 @@ FUNCTION GetRelPhaseAngle {
 lock NORMALVEC to VCRS(SHIP:VELOCITY:ORBIT,-BODY:POSITION).
 
 local transfer_angle is 120.
-LOCAL phase_transfer is 0.
-
+local phase_transfer is 0.
 local targetAp is 750e3.
-lock ap to ALT:apoapsis.
 local targetSMA is Mun:radius + targetAp.
-lock sma to SHIP:OBT:SemiMajorAxis.
-
 local allCallsigns IS List("Auxo","Karpo","Thallo").
 local callsign is GetCallsign().
-
 local dv is 0.
 local preburn is 0.
 local fullburn is 0.
 local node_time is 0.
+local throt is 0.
+
+lock ap to ALT:apoapsis.
+lock sma to SHIP:OBT:SemiMajorAxis.
 lock eta_burn to node_time - preburn - TIME:SECONDS.
 lock mnv_pct to 0.
-
 lock orient to NORMALVEC.
-lock steer is orient.
+lock steer to orient.
 lock STEERING to steer.
-
-local throt is 0.
 lock THROTTLE to throt.
 
 set steps to Lex(
@@ -81,7 +78,6 @@ else {
 	set targetAp to first:OBT:apoapsis.
 	set targetSMA to first:OBT:SemiMajorAxis.
 }
-
 function start{parameter m,p.
 	partLib["DoPartModuleAction"]("longAntenna","ModuleRTAntenna","deactivate").
 	partLib["DoPartModuleAction"]("HighGainAntenna5","ModuleRTAntenna","deactivate").
@@ -114,7 +110,7 @@ function coast{parameter m,p.
 	print "coasting to burn: " + round(eta_burn,2) + "s (" + round(preburn,3)+"s)     " at (0,1).
 
 	if eta_burn <= 60 lock steer to PROGRADE.
-	else lock steer is orient.
+	else lock steer to orient.
 
 	if eta_burn <= 0 {
 		lock throt to mnv_pct.
