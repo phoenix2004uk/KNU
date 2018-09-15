@@ -1,20 +1,6 @@
 local ORB is import("orbmech").
 local MNV is import("maneuver").
 local ISH is import("util/ish").
-function doBurn {
-	parameter testEnd.
-	if testEnd {
-		set throt to 0.
-		return 1.
-	}
-	if eta_burn+fullburn <= fullburn/100 {
-		set throt to 0.01.
-	}
-	else if eta_burn+fullburn <= fullburn/10 {
-		set throt to 0.1.
-	}
-	return 0.
-}
 lock NORMALVEC to VCRS(SHIP:VELOCITY:ORBIT,-BODY:POSITION).
 
 local maxInc is 0.01.
@@ -26,6 +12,7 @@ lock ecc to ship:obt:eccentricity.
 set lastInc to inc.
 set lastEcc to ecc.
 local throt is 0.
+local node_time is 0.
 local eta_burn is 0.
 local dv is 0.
 local preburn is 0.
@@ -59,7 +46,6 @@ function correctInc{parameter M,P.
 		local Ran is ORB["Rt"](ORB["Van"]()).
 		local Rdn is ORB["Rt"](ORB["Vdn"]()).
 		local vnode is 0.
-		local node_time is 0.
 		local sma is ship:obt:semiMajorAxis.
 		if Ran > Rdn {
 			lock steer to -NORMALVEC.
@@ -81,9 +67,14 @@ function correctInc{parameter M,P.
 }
 function burnInc{parameter M,P.
 	print "burntime: " + round(eta_burn+fullburn,3) + "s" at (0,0).
-	print maxInc-inc at (0,3).
+	print inc-maxInc at (0,3).
 	print inc-lastInc at (0,4).
-	if doBurn(inc < maxInc or round(inc - lastInc,6) > 0) M["next"]().
+	if inc < maxInc or round(inc - lastInc,6) > 0 {
+		set throt to 0.
+		M["next"]().
+	}
+	else if inc < maxInc*10 set throt to 0.1.
+	else if inc < maxInc*2 set throt to 0.01.
 	set lastInc to inc.
 }
 function correctAp{PARAMETER M,P.
@@ -108,7 +99,16 @@ function burnAp{PARAMETER M,P.
 	print "burntime: " + round(eta_burn+fullburn,3) + "s" at (0,0).
 	print ap at (0,7).
 	print targetAp at (0,8).
-	if doBurn(ISH["value"](ap, targetAp, 100)) M["next"]().
+	if ISH["value"](ap, targetAp, 100) {
+		set throt to 0.
+		M["next"]().
+	}
+	else if ISH["value"](ap, targetAp, 1000) {
+		set throt to 0.1.
+	}
+	else if ISH["value"](ap, targetAp, 250) {
+		set throt to 0.01.
+	}
 }
 function correctEcc{PARAMETER M,P.
 	print "ecc: " + ecc + ">" + maxEcc at (0,9).
@@ -117,16 +117,21 @@ function correctEcc{PARAMETER M,P.
 		set node_time to TIME:SECONDS + ETA:apoapsis.
 		lock eta_burn to node_time - TIME:SECONDS.
 		set dv to MNV["ChangePeDeltaV"](targetAp).
-		set preburn to MNV["GetMeneuverTime"](dv/2).
-		set fullburn to MNV["GetMeneuverTime"](dv).
+		set preburn to MNV["GetManeuverTime"](dv/2).
+		set fullburn to MNV["GetManeuverTime"](dv).
 		print "burn: "+round(dv,2)+"m/s in "+round(fullburn,2)+"s ("+round(preburn,2)+"s)" at (0,10).
 		M["next"]().
 	} else M["jump"](3).
 }
 function burnEcc{PARAMETER M,P.
 	print "burntime: " + round(eta_burn+fullburn,3) + "s" at (0,0).
-	print maxEcc-ecc at (0,11).
+	print ecc-maxEcc at (0,11).
 	print ecc-lastEcc at (0,12).
-	if doBurn(ecc < maxEcc or round(ecc - lastEcc,6) > 0) M["next"]().
+	if ecc < maxEcc or round(ecc - lastEcc,6) > 0 {
+		set throt to 0.
+		M["next"]().
+	}
+	else if ecc < maxEcc*50 set throt to 0.1.
+	else if ecc < maxEcc*5 set throt to 0.01.
 	set lastEcc to ecc.
 }
