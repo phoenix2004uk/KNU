@@ -7,12 +7,10 @@ function doBurn {
 		set throt to 0.
 		return 1.
 	}
-	if throt=0.1 and eta_burn+fullburn <= 1 {
-		set eta_burn to eta_burn + 9.
+	if eta_burn+fullburn <= fullburn/100 {
 		set throt to 0.01.
 	}
-	else if throt=1 and eta_burn+fullburn <= 1 {
-		set eta_burn to eta_burn + 9.
+	else if eta_burn+fullburn <= fullburn/10 {
 		set throt to 0.1.
 	}
 	return 0.
