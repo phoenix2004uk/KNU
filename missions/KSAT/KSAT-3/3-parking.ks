@@ -1,6 +1,7 @@
 local ORB is import("orbmech").
 local MNV is import("maneuver").
 local ISH is import("util/ish").
+LOCAL partLib IS import("util/parts").
 lock NORMALVEC to VCRS(SHIP:VELOCITY:ORBIT,-BODY:POSITION).
 
 local maxInc is 0.01.
@@ -24,15 +25,24 @@ lock THROTTLE to throt.
 
 set steps to Lex(
 0,coast@,
-1,correctInc@,
-2,burnInc@,
-3,correctAp@,
-4,burnAp@,
-5,correctEcc@,
-6,burnEcc@
+1,init@,
+2,end@,
+3,correctInc@,
+4,burnInc@,
+5,correctAp@,
+6,burnAp@,
+7,correctEcc@,
+8,burnEcc@
 ).
-set sequence to List(1,0,2,3,0,4,5,0,6).
+set sequence to List(1,3,0,4,5,0,6,7,0,8,2).
 clearscreen.
+function init{parameter M,P.
+	partLib["DoPartModuleAction"]("longAntenna","ModuleRTAntenna","deactivate").
+	partLib["DoPartModuleAction"]("HighGainAntenna5","ModuleRTAntenna","deactivate").
+}
+function end{parameter M,P.
+	partLib["DoPartModuleEvent"]("HighGainAntenna5","ModuleRTAntenna","activate").
+}
 function coast{parameter M,P.
 	print "coasting to burn: " + round(eta_burn,2) + "s (-" + round(preburn,3)+"s)     " at (0,0).
 	if eta_burn <= preburn {
