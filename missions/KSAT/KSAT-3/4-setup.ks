@@ -87,7 +87,8 @@ function calc_xfer_burn{parameter m,p.
 	set preburn to MNV["GetManeuverTime"](dv/2).
 	set fullburn to MNV["GetManeuverTime"](dv).
 	set node_time to TIME:seconds + ETA:periapsis.
-	lock mnv_pct to max(0,min(100000,targetAp-ap)/1000).
+	lock mnv_pct to 1-(1-min((targetAp-ap)/300000;1))^0.05
+
 	print "xfer burn: "+round(dv,2)+"m/s in "+round(fullburn,2)+"s ("+round(preburn,2)+"s)" at (0,0).
 	m["next"]().
 }
@@ -100,7 +101,7 @@ function wait_xfer_burn{parameter m,p.
 	} else lock steer to orient.
 
 	if phase_transfer - phase_delta_start - phase_current <= 0 {
-		lock THROTTLE to mnv_pct.
+		lock THROTTLE to max(0.001,min(1,mnv_pct)).
 		m["next"]().
 	}
 }
@@ -111,14 +112,14 @@ function coast{parameter m,p.
 	else lock steer to orient.
 
 	if eta_burn <= 0 {
-		lock THROTTLE to mnv_pct.
+		lock THROTTLE to max(0.001,min(1,mnv_pct)).
 		m["next"]().
 	}
 }
 function do_xfer_burn{parameter m,p.
 	print "burntime: " + round(eta_burn+fullburn,3) + "s" at (0,2).
 	print "target Ap: " + round(targetAp,3) + "m" at (0,3).
-	print "delta: " + round(targetAp-ap) + "m @"+mnv_pct at (0,4).
+	print "delta: " + round(targetAp-ap) + "m @"+round(mnv_pct*100,2)+"%" at (0,4).
 	if ap >= targetAp {
 		lock THROTTLE to 0.
 		m["next"]().
@@ -130,14 +131,15 @@ function calc_circ_burn{parameter m,p.
 	set preburn to MNV["GetManeuverTime"](dv/2).
 	set fullburn to MNV["GetManeuverTime"](dv).
 	set node_time to TIME:seconds + ETA:apoapsis.
-	lock mnv_pct to max(0,min(100000,targetSMA-sma)/1000).
+	lock mnv_pct to 1-(1-min((targetSMA-sma)/300000;1))^0.05
+
 	print "circ burn: "+round(dv,2)+"m/s in "+round(fullburn,2)+"s ("+round(preburn,2)+"s)" at (0,0).
 	m["next"]().
 }
 function do_circ_burn{parameter m,p.
 	print "burntime: " + round(eta_burn+fullburn,3) + "s" at (0,2).
 	print "target sma: " + round(targetSMA,3) + "m" at (0,3).
-	print "delta: " + round(targetSMA-sma) + "m @"+mnv_pct at (0,4).
+	print "delta: " + round(targetSMA-sma) + "m @"+round(mnv_pct*100,2)+"%" at (0,4).
 	if sma >= targetSMA {
 		lock THROTTLE to 0.
 		m["next"]().
