@@ -39,9 +39,12 @@ clearscreen.
 function init{parameter M,P.
 	partLib["DoPartModuleAction"]("longAntenna","ModuleRTAntenna","deactivate").
 	partLib["DoPartModuleAction"]("HighGainAntenna5","ModuleRTAntenna","deactivate").
+	M["next"]().
 }
 function end{parameter M,P.
 	partLib["DoPartModuleEvent"]("HighGainAntenna5","ModuleRTAntenna","activate").
+	set steer to orient.
+	M["next"]().
 }
 function coast{parameter M,P.
 	print "coasting to burn: " + round(eta_burn,2) + "s (-" + round(preburn,3)+"s)     " at (0,0).
