@@ -41,7 +41,6 @@ local dv is 0.
 local preburn is 0.
 local fullburn is 0.
 local node_time is 0.
-local throt is 0.
 
 lock ap to ALT:apoapsis.
 lock sma to SHIP:OBT:SemiMajorAxis.
@@ -50,7 +49,6 @@ lock mnv_pct to 0.
 lock orient to NORMALVEC.
 lock steer to orient.
 lock STEERING to steer.
-lock THROTTLE to throt.
 
 set steps to Lex(
 0,start@,
@@ -89,7 +87,7 @@ function calc_xfer_burn{parameter m,p.
 	set preburn to MNV["GetManeuverTime"](dv/2).
 	set fullburn to MNV["GetManeuverTime"](dv).
 	set node_time to TIME:seconds + ETA:periapsis.
-	lock mnv_pct to max(0,min(10000,targetAp-ap)/100).
+	lock mnv_pct to max(0,min(100000,targetAp-ap)/1000).
 	print "xfer burn: "+round(dv,2)+"m/s in "+round(fullburn,2)+"s ("+round(preburn,2)+"s)" at (0,0).
 	m["next"]().
 }
@@ -102,7 +100,7 @@ function wait_xfer_burn{parameter m,p.
 	} else lock steer to orient.
 
 	if phase_transfer - phase_delta_start - phase_current <= 0 {
-		lock throt to mnv_pct.
+		lock THROTTLE to mnv_pct.
 		m["next"]().
 	}
 }
@@ -113,7 +111,7 @@ function coast{parameter m,p.
 	else lock steer to orient.
 
 	if eta_burn <= 0 {
-		lock throt to mnv_pct.
+		lock THROTTLE to mnv_pct.
 		m["next"]().
 	}
 }
@@ -122,7 +120,7 @@ function do_xfer_burn{parameter m,p.
 	print "target Ap: " + round(targetAp,3) + "m" at (0,3).
 	print "delta: " + round(targetAp-ap) + "m @"+mnv_pct at (0,4).
 	if ap >= targetAp {
-		set throt to 0.
+		lock THROTTLE to 0.
 		m["next"]().
 	}
 }
@@ -132,7 +130,7 @@ function calc_circ_burn{parameter m,p.
 	set preburn to MNV["GetManeuverTime"](dv/2).
 	set fullburn to MNV["GetManeuverTime"](dv).
 	set node_time to TIME:seconds + ETA:apoapsis.
-	lock mnv_pct to max(0,min(10000,targetSMA-sma)/100).
+	lock mnv_pct to max(0,min(100000,targetSMA-sma)/1000).
 	print "circ burn: "+round(dv,2)+"m/s in "+round(fullburn,2)+"s ("+round(preburn,2)+"s)" at (0,0).
 	m["next"]().
 }
@@ -141,7 +139,7 @@ function do_circ_burn{parameter m,p.
 	print "target sma: " + round(targetSMA,3) + "m" at (0,3).
 	print "delta: " + round(targetSMA-sma) + "m @"+mnv_pct at (0,4).
 	if sma >= targetSMA {
-		set throt to 0.
+		lock THROTTLE to 0.
 		m["next"]().
 	}
 }
