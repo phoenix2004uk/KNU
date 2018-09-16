@@ -1,0 +1,80 @@
+ARIA 1-6
+- early space program rockets (sub-orbital)
+- altitude and speed records
+- gain science from around kerbin's biomes
+======================================================================================
+PIONEER 1-7
+- early chemical rockets
+- orbital testing
+- gain science from space around kerbin and atmospheric science
+- development of launch profiles
+======================================================================================
+KSAT-1
+- LKO relay network with dishes covering mun/minmus transfers
+- early rendezvous system testing for satellite separation
+======================================================================================
+SCAN 1-3
+- SCANSat RADAR satellites
+  - SCAN-1 Maxwell I - Kerbin RADAR
+  - SCAN-2 Maxwell II - Mun RADAR
+  - SCAN-3 Maxwell III - Minmus RADAR
+
+RANGER 1-2
+- kerbin system exploration (Mun and Minmus)
+- test new OS (mission runner)
+- RANGER-1 Mun encounter
+  - transfer to Mun
+  - enter orbit
+  - impact surface
+- RANGER-2 Minmus encounter
+  - low flyby
+  - escape kerbin's soi
+  - return to kerbin and burnup
+======================================================================================
+
+*** switched to new BOOT+KNULDR and MissionRunner system ***
+
+======================================================================================
+PIONEER-8
+- powered descent and landing test outside KSC
+======================================================================================
+KSAT-2 Mun relay network
+KSAT-3 Minmus relay network
+
+SCAN 4-6
+-SCANSat BIOME satellites
+  - SCAN-4 GeoEye I - Kerbin BIOME
+  - SCAN-5 GeoEye II - Mun BIOME
+  - SCAN-6 GeoEye III - Minmus BIOME
+======================================================================================
+PIONEER-9
+- suicide burn and hover testing program
+======================================================================================
+RANGER 3-4
+- RANGER-3 Mun Landing
+- RANGER-4 Minmus Landing
+
+PIONEER-10
+- powered landing tests at a targetted location
+======================================================================================
+*** Begin Manned Program ***
+ANTARES 1-6 - first manned launches / develop safety systems
+- ANTARES-1 - first manned launch and parachute landing - low altitude
+- ANTARES-2 - test launch abort system
+- ANTARES-3 - manned sub-orbital launch and parachute landing
+- ANTARES-4 - develop full launch abort system
+- ANTARES-5 - manned orbit and safe return
+- ANTARES-6 - extended orbit and return
+
+RANGER 5-6
+- RANGER-5 Mun Landing (Targeted)
+- RANGER-6 Minmus Landing (Targeted)
+
+PIONEER 11-13
+- PIONEER-11 dummy target drone launched into LKO
+- PIONEER-12 orbital rendezvous in LKO with PIONEER-11
+- PIONEER-13 orbital rendezvous docking in LKO
+======================================================================================
+
+KSS
+- KSS-1 launch KSS core into LKO
