@@ -55,7 +55,7 @@ function coast_to_burn{parameter m,p.
 function do_xfer_burn{parameter m,p.
 	print "burntime: " + round(eta_burn+fullburn,3) + "s" at (0,2).
 	print "target Ap: " + round(targetAp,3) + "m" at (0,3).
-	print "delta: " + round(targetAp-ap) + "m".
+	print "delta: " + round(targetAp-ap) + "m" at (0,4).
 	if SHIP:OBT:hasNextPatch and SHIP:OBT:nextPatch:body = Minmus {
 		lock THROTTLE to 0.1.
 		if SHIP:OBT:nextPatch:periapsis < 50000 {

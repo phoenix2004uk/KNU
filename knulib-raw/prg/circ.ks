@@ -1,6 +1,5 @@
 {
 	LOCAL MNV IS import("maneuver").
-	LOCAL ISH IS import("util/ish").
 
 	LOCAL WARP_THRESHOLD IS 60.
 	LOCAL WARP_END_TIME IS 30.
@@ -44,7 +43,8 @@
 		IF public["timeOfBurn"]-TIME:SECONDS - public["half_burn_duration"] <= 0 {
 			MNV["Steer"](NEXTNODE:DELTAV).
 			LOCK THROTTLE TO 1.
-			IF ISH["value"](SHIP:OBT:ECCENTRICITY, ECCENTRICITY_TARGET, ECCENTRICITY_ISHYNESS) OR ROUND(SHIP:OBT:ECCENTRICITY,5) > public["lastEcc"] {
+			WAIT 0.1.
+			IF SHIP:OBT:ECCENTRICITY <= ECCENTRICITY_TARGET OR ROUND(SHIP:OBT:ECCENTRICITY,5) > public["lastEcc"] {
 				LOCK THROTTLE TO 0.
 				REMOVE NEXTNODE.
 				mission["next"]().
