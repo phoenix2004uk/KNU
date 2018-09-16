@@ -7,6 +7,8 @@
 		return value.
 	}
 
+	// gets a true anomaly in the solar prime reference frame
+	// allows us to compare true anomaly across different orbitals
 	function solar_anomaly {
 		parameter orbitable.
 		return degmod( orbitable:OBT:LAN + orbitable:OBT:argumentOfPeriapsis + orbitable:OBT:trueAnomaly).
