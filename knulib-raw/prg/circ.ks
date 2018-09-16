@@ -1,6 +1,6 @@
 {
 	LOCAL MNV IS import("maneuver").
-	LOCAL converge IS import("util/converge").
+	LOCAL ISH IS import("util/ish").
 
 	LOCAL WARP_THRESHOLD IS 60.
 	LOCAL WARP_END_TIME IS 30.
@@ -23,8 +23,7 @@
 
 		Add NODE(public["timeOfBurn"], 0, 0, dV_circularize).
 		MNV["Steer"](NEXTNODE:DELTAV).
-
-		SET public["converge"] TO converge["create"](SHIP:OBT:ECCENTRICITY, ECCENTRICITY_TARGET, ECCENTRICITY_ISHYNESS).
+		SET public["lastEcc"] TO ROUND(SHIP:OBT:ECCENTRICITY,5).
 		mission["save"](public).
 		mission["next"]().
 	}.
@@ -45,11 +44,12 @@
 		IF public["timeOfBurn"]-TIME:SECONDS - public["half_burn_duration"] <= 0 {
 			MNV["Steer"](NEXTNODE:DELTAV).
 			LOCK THROTTLE TO 1.
-			IF converge["check"](public["converge"], SHIP:OBT:ECCENTRICITY) {
+			IF ISH["value"](SHIP:OBT:ECCENTRICITY, ECCENTRICITY_TARGET, ECCENTRICITY_ISHYNESS) OR ROUND(SHIP:OBT:ECCENTRICITY,5) > public["lastEcc"] {
 				LOCK THROTTLE TO 0.
 				REMOVE NEXTNODE.
 				mission["next"]().
 			}
+			SET public["lastEcc"] TO ROUND(SHIP:OBT:ECCENTRICITY,5).
 		}
 	}.
 
@@ -76,7 +76,7 @@
 	}.
 
 	export(Lex(
-		"version", "1.0.6",
+		"version", "1.0.7",
 		"new", constructor
 	)).
 }
