@@ -1,49 +1,72 @@
 local MNV is import("maneuver").
-LOCAL partLib IS import("util/parts").
-FUNCTION CalcSMA {
-	PARAMETER Ap,Pe,R IS BODY:RADIUS.
-	RETURN (Pe+Ap)/2+R.
+LOCAL partLib is import("util/parts").
+
+// because kos MOD handles negatives differently
+function degmod {
+	parameter value.
+	if value > 360 return mod(value, 360).
+	if value < 0 until value >= 0 set value to value + 360.
+	return value.
 }
-FUNCTION CalcPeriod {
-	PARAMETER sma,tBody IS BODY.
-	RETURN 2*CONSTANT:PI*SQRT(sma^3/tBody:MU).
+
+function anomaly_of_transfer_circ {
+	parameter final_separation, target_orbital is TARGET, source_orbital is SHIP, parentBody IS BODY.
+
+	local a_source is source_orbital:OBT:semiMajorAxis.
+	local a_target is target_orbital:OBT:semiMajorAxis.
+	local n_target is 360 / target_orbital:OBT:period.
+
+	local a_transfer is (a_source + a_target) / 2.
+	local T_transfer is CONSTANT:PI*SQRT(a_transfer^3/parentBody:MU).
+
+	local dTheta_of_target_during_transfer is n_target * T_transfer.
+
+	// adding 180 since we start 180' from where we finish
+	local anomaly_between_vessels_before_transfer is final_separation - dTheta_of_target_during_transfer + 180.
+
+	return degmod(anomaly_between_vessels_before_transfer).
 }
-FUNCTION GetCircTransferPhaseAngle {
-	PARAMETER angFinal,vTarget IS TARGET.
-	LOCAL R IS BODY:RADIUS.
-	LOCAL a_target IS vTarget:OBT:SEMIMAJORAXIS.
-	LOCAL T_target IS vTarget:OBT:PERIOD.
-	LOCAL a_transfer IS CalcSMA(a_target-R,SHIP:OBT:SEMIMAJORAXIS-R).
-	LOCAL T_transfer IS CalcPeriod(a_transfer).
-	LOCAL n_target IS 360 / T_target.
-	LOCAL dt_transfer IS n_target * T_transfer/2.
-	RETURN angFinal - dt_transfer.
+
+function solar_anomaly {
+	parameter orbitable.
+	return degmod( orbitable:OBT:LAN + orbitable:OBT:argumentOfPeriapsis + orbitable:OBT:trueAnomaly).
 }
-FUNCTION GetAbsPhaseAngle {
-	parameter v1 IS TARGET, v2 IS SHIP,t IS TIME:SECONDS.
-	RETURN VANG(BODY:position-positionAt(v1,t-0.001), BODY:position-positionAt(v2,t-0.001)).
+
+function eta_to_transfer_circ {
+	parameter transfer_anomaly, target_orbital is TARGET, source_orbital is SHIP, parentBody IS BODY.
+
+	// target parameters
+	local n_target is 360 / target_orbital:OBT:period.
+	local s0_target is solar_anomaly(target_orbital).
+
+	// source parameters
+	local n_source is 360 / source_orbital:OBT:period.
+	local s0_source is solar_anomaly(source_orbital).
+
+	// eta parameters
+	local theta_current is degmod( s0_target - s0_source).
+	local dTheta is degmod( theta_current - transfer_anomaly).
+	local n_diff is abs( n_target - n_source ).
+
+	return dTheta / n_diff.
 }
-FUNCTION GetRelPhaseAngle {
-	parameter v1 IS TARGET, v2 IS SHIP,t IS TIME:SECONDS,dt IS 60.
-	LOCAL a1 IS GetAbsPhaseAngle(v1,v2,t).
-	LOCAL a2 IS GetAbsPhaseAngle(v1,v2,t+dt).
-	IF a2>a1 RETURN -a1. RETURN a1.
-}
+
 lock NORMALVEC to VCRS(SHIP:VELOCITY:ORBIT,-BODY:POSITION).
 
-local transfer_angle is 120.
-local phase_transfer is 0.
+local separation_angle is 120.
 local targetAp is 750e3.
 local targetSMA is Mun:radius + targetAp.
-local allCallsigns IS List("Auxo","Karpo","Thallo").
+local allCallsigns is List("Auxo","Karpo","Thallo").
 local callsign is GetCallsign().
 local dv is 0.
 local preburn is 0.
 local fullburn is 0.
 local node_time is 0.
+local throt_pct_limit is 100000.
+local throt_pct_exponent is 0.25.
 
 lock ap to ALT:apoapsis.
-lock sma to SHIP:OBT:SemiMajorAxis.
+lock sma to SHIP:OBT:semiMajorAxis.
 lock eta_burn to node_time - preburn - TIME:SECONDS.
 lock mnv_pct to 0.
 lock orient to NORMALVEC.
@@ -53,29 +76,29 @@ lock STEERING to steer.
 set steps to Lex(
 0,start@,
 1,coast@,
-2,wait_xfer_burn@,
+2,align_xfer_burn@,
 3,calc_xfer_burn@,
 4,do_xfer_burn@,
 5,calc_circ_burn@,
 6,do_circ_burn@,
-7,done@
+7,fine_tune_sma@,
+8,done@
 ).
 
 if callsign = allCallsigns[0] {
-	set sequence to List(0,3,1,4,5,1,6,7).
+	set sequence to List(0,3,1,4,5,1,6,7,8).
 }
 else {
-	set sequence to List(0,3,2,4,5,1,6,7).
+	set sequence to List(0,3,2,1,4,5,1,6,7,8).
 	local follow is "".
 	local first is Vessel("KSAT - Mun '"+allCallsigns[0]+"'").
 	if callsign = allCallsigns[1] set follow to allCallsigns[0].
 	if callsign = allCallsigns[2] set follow to allCallsigns[1].
 	set TARGET to Vessel("KSAT - Mun '"+follow+"'").
-	lock phase_current to GetRelPhaseAngle(TARGET).
-	set phase_transfer to GetCircTransferPhaseAngle(transfer_angle).
-	set targetAp to first:OBT:apoapsis.
-	set targetSMA to first:OBT:SemiMajorAxis.
+
+	set targetSMA to first:OBT:semiMajorAxis.
 }
+
 function start{parameter m,p.
 	partLib["DoPartModuleAction"]("longAntenna","ModuleRTAntenna","deactivate").
 	partLib["DoPartModuleAction"]("HighGainAntenna5","ModuleRTAntenna","deactivate").
@@ -87,23 +110,16 @@ function calc_xfer_burn{parameter m,p.
 	set preburn to MNV["GetManeuverTime"](dv/2).
 	set fullburn to MNV["GetManeuverTime"](dv).
 	set node_time to TIME:seconds + ETA:periapsis.
-	lock mnv_pct to 1-(1-min((targetAp-ap)/300000;1))^0.05
+	lock mnv_pct to 1-(1-min((targetAp-ap)/throt_pct_limit,1))^throt_pct_exponent.
 
 	print "xfer burn: "+round(dv,2)+"m/s in "+round(fullburn,2)+"s ("+round(preburn,2)+"s)" at (0,0).
 	m["next"]().
 }
-function wait_xfer_burn{parameter m,p.
-	local phase_delta_start is preburn*360/SHIP:OBT:period.
-	print "waiting for transfer angle: "+round(phase_transfer,3)+" - "+round(phase_delta_start,3)+" = "+round(phase_current,3) at (0,1).
+function align_xfer_burn{parameter m,p.
+	local transfer_anomaly to anomaly_of_transfer_circ(separation_angle).
+	set node_time to TIME:seconds + eta_to_transfer_circ(transfer_anomaly).
 
-	if phase_transfer - phase_delta_start - phase_current <= 5 {
-		lock steer to PROGRADE.
-	} else lock steer to orient.
-
-	if phase_transfer - phase_delta_start - phase_current <= 0 {
-		lock THROTTLE to max(0.001,min(1,mnv_pct)).
-		m["next"]().
-	}
+	m["next"]().
 }
 function coast{parameter m,p.
 	print "coasting to burn: " + round(eta_burn,2) + "s (" + round(preburn,3)+"s)     " at (0,1).
@@ -131,7 +147,7 @@ function calc_circ_burn{parameter m,p.
 	set preburn to MNV["GetManeuverTime"](dv/2).
 	set fullburn to MNV["GetManeuverTime"](dv).
 	set node_time to TIME:seconds + ETA:apoapsis.
-	lock mnv_pct to 1-(1-min((targetSMA-sma)/300000;1))^0.05
+	lock mnv_pct to 1-(1-min((targetSMA-sma)/throt_pct_limit,1))^throt_pct_exponent.
 
 	print "circ burn: "+round(dv,2)+"m/s in "+round(fullburn,2)+"s ("+round(preburn,2)+"s)" at (0,0).
 	m["next"]().
@@ -141,6 +157,15 @@ function do_circ_burn{parameter m,p.
 	print "target sma: " + round(targetSMA,3) + "m" at (0,3).
 	print "delta: " + round(targetSMA-sma) + "m @"+round(mnv_pct*100,2)+"%" at (0,4).
 	if sma >= targetSMA {
+		lock THROTTLE to 0.
+		lock steer to RETROGRADE.
+		WAIT 10.
+		lock THROTTLE to 0.00001.
+		m["next"]().
+	}
+}
+function fine_tune_sma{parameter m,p.
+	if sma <= targetSMA {
 		lock THROTTLE to 0.
 		m["next"]().
 	}
