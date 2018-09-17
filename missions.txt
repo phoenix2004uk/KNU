@@ -10,6 +10,8 @@ PIONEER 1-7
 - development of launch profiles
 ======================================================================================
 KSAT-1
+- first communications satellite with a dish pointing towards Mun
+KSAT-2
 - LKO relay network with dishes covering mun/minmus transfers
 - early rendezvous system testing for satellite separation
 ======================================================================================
@@ -38,8 +40,9 @@ RANGER 1-2
 PIONEER-8
 - powered descent and landing test outside KSC
 ======================================================================================
-KSAT-2 Mun relay network
-KSAT-3 Minmus relay network
+KSAT-3 Mun relay network
+KSAT-4 LKO upgraded relay
+KSAT-5 Minmus relay network
 
 SCAN 4-6
 -SCANSat BIOME satellites
