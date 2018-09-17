@@ -16,6 +16,8 @@ set throt to 0.
 lock orient to PROGRADE+R(0,0,0).
 lock steer to orient.
 lock burnEta to burnTime - TIME:seconds.
+lock STEERING to steer.
+lock THROTTLE to throt.
 
 local allCallsigns is List("Stilbon","Eosphorus","Hesperus","Pyroeis","Phaethon","Phaenon").
 local callsign is GetCallsign().
@@ -102,7 +104,12 @@ function circularize{parameter m,p.
 function waitForAll{parameter m,p.
 	LIST TARGETS in allTargets.
 	local iter is allTargets:iterator.
-	until not iter:next if iter:value:name = "KSAT - LKO '"+allCallsigns[allCallsigns:length-1]+"'" m["next"](). else wait 10.
+	until not iter:next if iter:value:name = "KSAT - LKO '"+allCallsigns[allCallsigns:length-1]+"'" {
+		if isFirst or TARGET:OBT:semiMajorAxis > targetSMA*0.9 {
+			m["next"]().
+		}
+	}
+	wait 10.
 }
 function calcTransfer{parameter m,p.
 	set dv to MNV["ChangeApDeltaV"](targetAp).
