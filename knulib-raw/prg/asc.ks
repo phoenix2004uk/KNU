@@ -28,6 +28,7 @@
 		UNTIL SHIP:AVAILABLETHRUST > 1 SYS["SafeStage"]().
 
 		IF private["srbPitch"] AND STAGE:SolidFuel > 50 {
+			set private[50] to STAGE:number.
 			mission["enable"]("srbPitch").
 		}
 
@@ -72,7 +73,8 @@
 
 	LOCAL evt_burnout IS {
 		PARAMETER private, mission, public.
-		SYS["Burnout"](TRUE, private["lastStage"]).
+		if STAGE:NUMBER = private[50] and SYS["Burnout"]() SYS["SafeStage"]().
+		else SYS["Burnout"](TRUE, private["lastStage"]).
 	}.
 
 	// this event adjusts ascent profile when using SRB launch to prevent excessive pitching when they shut off
@@ -113,7 +115,8 @@
 				"aN", 60000,
 				"pN", 0,
 				"a1", 40000
-			)
+			),
+			50, -1	// used for staging solid boosters without cutting throttle
 		).
 		FOR key IN private:KEYS IF args:HASKEY(key) SET private[key] TO args[key].
 
