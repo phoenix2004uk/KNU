@@ -11,8 +11,8 @@ local targetSMA is 2e6.
 local lastStage is 0.
 local launchHeading is 90.
 local counter is 10.
-local throt is 0.
 local burnTime is 0.
+set throt to 0.
 lock orient to PROGRADE+R(0,0,0).
 lock steer to orient.
 lock burnEta to burnTime - TIME:seconds.
