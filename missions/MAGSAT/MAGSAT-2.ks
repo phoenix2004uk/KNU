@@ -101,7 +101,7 @@ function circularize{parameter m,p.
 		set throt to 0.
 		m["next"]().
 	}
-	else if burnEta<=0set throt to 1.
+	else if burnEta<=0 set throt to 1.
 }
 function calcTransfer{parameter m,p.
 	set TARGET to Mun.
