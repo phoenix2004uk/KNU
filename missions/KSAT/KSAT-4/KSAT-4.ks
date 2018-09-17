@@ -40,7 +40,6 @@ set steps to Lex(
 ).
 
 if not isFirst {
-	set sequence to List(0,1,2,3,4,5,6).
 	local first is Vessel("KSAT - LKO '"+allCallsigns[0]+"'").
 	local iter is allCallsigns:iterator.
 	until not iter:next if callsign=iter:value set TARGET to Vessel("KSAT - LKO '"+allCallsigns[iter:index-1]+"'").
