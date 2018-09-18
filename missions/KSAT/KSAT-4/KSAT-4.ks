@@ -107,8 +107,15 @@ function circularize{parameter m,p.
 }
 function waitForAll{parameter m,p.
 	LIST TARGETS in allTargets.
-	local iter is allTargets:iterator.
-	until not iter:next if iter:value:name = "KSAT - LKO '"+allCallsigns[allCallsigns:length-1]+"'" {
+	local outer is allTargets:iterator.
+	local allInOrbit is 0.
+	until not outer:next {
+		local inner is allCallsigns:iterator.
+		until not inner:next {
+			if outer:value:name = "KSAT - LKO '"+inner:value+"'" set allInOrbit to allInOrbit + 1.
+		}
+	}
+	if allInOrbit = allCallsigns:length-1 {
 		if isFirst m["next"]().
 		else if TARGET:OBT:semiMajorAxis > targetSMA*0.9 {
 			set targetSMA to first:OBT:semiMajorAxis.
