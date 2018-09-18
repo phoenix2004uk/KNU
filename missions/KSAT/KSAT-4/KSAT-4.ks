@@ -5,12 +5,15 @@ set RDV to import("rendezvous").
 lock NORMALVEC to VCRS(SHIP:VELOCITY:ORBIT,-BODY:POSITION).
 lock RADIALVEC TO VXCL(PROGRADE:VECTOR, UP:VECTOR).
 
+wait until SHIP=KUNIVERSE:activeVessel.
+
 local parkingAp is 100e3.
 local targetAp is 1.4e6.
 local targetSMA is 2e6.
 local lastStage is 0.
 local launchHeading is 90.
 local counter is 10.
+local dv is 0.
 local burnTime is 0.
 set throt to 0.
 lock orient to PROGRADE+R(0,0,0).
@@ -42,10 +45,9 @@ set steps to Lex(
 ).
 
 if not isFirst {
-	local first is Vessel("KSAT - LKO '"+allCallsigns[0]+"'").
+	set first to Vessel("KSAT - LKO '"+allCallsigns[0]+"'").
 	local iter is allCallsigns:iterator.
 	until not iter:next if callsign=iter:value set TARGET to Vessel("KSAT - LKO '"+allCallsigns[iter:index-1]+"'").
-	set targetSMA to first:OBT:semiMajorAxis.
 }
 
 function countdown{parameter m,p.
@@ -79,7 +81,8 @@ function inspace{parameter m,p.
 	m["next"]().
 }
 function insertion{parameter m,p.
-	if ALT:periapsis >= 15000 {
+	if dv=0 m["jump"](-1).
+	else if ALT:periapsis >= 15000 {
 		set throt to 0.
 		WAIT 1. UNTIL STAGE:NUMBER=lastStage SYS["SafeStage"]().
 		m["next"]().
@@ -95,7 +98,8 @@ function calcCircularize{parameter m,p.
 	m["next"]().
 }
 function circularize{parameter m,p.
-	if ALT:periapsis >= targetPe or burnEta + fullburn <= 0 {
+	if dv=0 m["jump"](-1).
+	else if ALT:periapsis >= targetPe or burnEta + fullburn <= 0 {
 		set throt to 0.
 		m["next"]().
 	}
@@ -105,7 +109,9 @@ function waitForAll{parameter m,p.
 	LIST TARGETS in allTargets.
 	local iter is allTargets:iterator.
 	until not iter:next if iter:value:name = "KSAT - LKO '"+allCallsigns[allCallsigns:length-1]+"'" {
-		if isFirst or TARGET:OBT:semiMajorAxis > targetSMA*0.9 {
+		if isFirst m["next"]().
+		else if TARGET:OBT:semiMajorAxis > targetSMA*0.9 {
+			set targetSMA to first:OBT:semiMajorAxis.
 			m["next"]().
 		}
 	}
@@ -123,14 +129,15 @@ function calcTransfer{parameter m,p.
 	m["next"]().
 }
 function transfer{parameter m,p.
-	if ALT:apoapsis >= targetAp {
+	if dv=0 m["jump"](-1).
+	else if ALT:apoapsis >= targetAp {
 		set throt to 0.
 		m["next"]().
 	}
-	else if throt=1 and ALT:apoapsis >= targetAp*0.8 {
-		lock throt to max(0.001, min(0.1, 0.1 - (ALT:apoapsis-targetAp*0.8)/targetAp*2)).
+	else if throt=1 and ALT:apoapsis >= targetAp*0.95 {
+		lock throt to max(0.01, min(0.1, 0.1 - (ALT:apoapsis-targetAp*0.95)/(targetAp*0.5))).
 	}
-	else if burnEta<=0 set throt to 1.
+	else if throt=0 and burnEta<=0 set throt to 1.
 }
 function calcFinalBurn{parameter m,p.
 	set dv to MNV["ChangePeDeltaV"](min(targetAp,ALT:apoapsis)).
@@ -140,14 +147,15 @@ function calcFinalBurn{parameter m,p.
 	m["next"]().
 }
 function finalBurn{parameter m,p.
-	if SHIP:OBT:semiMajorAxis >= targetSMA {
+	if dv=0 m["jump"](-1).
+	else if SHIP:OBT:semiMajorAxis >= targetSMA {
 		set throt to 0.
 		m["next"]().
 	}
-	else if throt=1 and SHIP:OBT:semiMajorAxis >= targetSMA*0.8 {
-		lock throt to max(0.001, min(0.1, 0.1 - (SHIP:OBT:semiMajorAxis-targetSMA*0.8)/targetSMA*2)).
+	else if throt=1 and SHIP:OBT:semiMajorAxis >= targetSMA*0.95 {
+		lock throt to max(0.01, min(0.1, 0.1 - (SHIP:OBT:semiMajorAxis-targetSMA*0.95)/(targetSMA*0.5))).
 	}
-	else if burnEta<=0 set throt to 1.
+	else if throt=0 and burnEta<=0 set throt to 1.
 }
 function adjustSMA{parameter m,p.
 	MNV["Steer"](RETROGRADE).
@@ -158,11 +166,11 @@ function adjustSMA{parameter m,p.
 	}
 }
 function done{parameter m,p.
-	local m is "ModuleRTAntenna".
-	PRT["DoModuleEvent"](m,"activate").
-	PRT["SetPartModuleField"]("HighGainAntenna5",m,"target",Mun,0).
-	PRT["SetPartModuleField"]("HighGainAntenna5",m,"target","active-vessel",1).
-	PRT["SetPartModuleField"]("RTShortDish2",m,"target",Minmus).
+	local rt is "ModuleRTAntenna".
+	PRT["DoModuleEvent"](rt,"activate").
+	PRT["SetPartModuleField"]("HighGainAntenna5",rt,"target",Mun,0).
+	PRT["SetPartModuleField"]("HighGainAntenna5",rt,"target","active-vessel",1).
+	PRT["SetPartModuleField"]("RTShortDish2",rt,"target",Minmus).
 	lock steer to orient.
 	m["next"]().
 }
