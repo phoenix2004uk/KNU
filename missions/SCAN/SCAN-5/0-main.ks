@@ -10,8 +10,9 @@ lock RADIALVEC TO VXCL(PROGRADE:VECTOR, UP:VECTOR).
 function SetAlarm{parameter t,n.AddAlarm("Raw",t-30,n,"margin").AddAlarm("Raw",t,n,"").}
 
 local parkingAp is 100e3.
-local finalAp is 234e3.
-local finalAltIsh is 1e3.
+local finalAp is 235e3.
+local finalPe is 234e3.
+local finalAltIsh is 500.
 local finalEcc is 0.002.
 local finalInc is 87.1.
 local finalIncIsh is 0.25.
@@ -50,7 +51,11 @@ set steps to Lex(
 12,inclinationBurn@,
 13,calcCaptureBurn@,
 14,captureBurn@,
-15,done@
+15,calcFinalApBurn@,
+16,finalApBurn@,
+17,calcFinalEccBurn@,
+18,finalEccBurn@,
+19,done@
 ).
 
 function countdown{parameter m,p.
@@ -113,13 +118,16 @@ function circularize{parameter m,p.
 	else if burnEta<=0 set throt to 1.
 }
 function calcMunTransfer{parameter m,p.
-	set TARGET to Mun.
 	set dv to MNV["ChangeApDeltaV"](Mun:altitude).
 	set preburn to MNV["GetManeuverTime"](dv/2).
-	local transferAnomaly to RDV["VTransferCirc"](0, Mun).
-	set burnTime to TIME:seconds + RDV["etaTransferCirc"](transferAnomaly, Mun)-preburn.
-	SetAlarm(burnTime,"transfer").
-	m["next"]().
+	local transferAnomaly is RDV["VTransferCirc"](0, Mun).
+	local etaTransfer is RDV["etaTransferCirc"](transferAnomaly, Mun).
+	if etaTransfer - preburn > 0 {
+		set TARGET to Mun.
+		set burnTime to TIME:seconds + etaTransfer - preburn.
+		SetAlarm(burnTime,"transfer").
+		m["next"]().
+	}
 }
 function munTransfer{parameter m,p.
 	if SHIP:OBT:hasNextPatch and SHIP:OBT:nextPatch:body = Mun {
@@ -185,11 +193,57 @@ function calcCaptureBurn{parameter m,p.
 	m["next"]().
 }
 function captureBurn{parameter m,p.
-	if Ap > 0 and Ap < finalAp {
+	if burnEta + fullburn <= 0 and Ap > 0 {
 		set throt to 0.
 		m["next"]().
 	}
 	else if burnEta <= 0 set throt to 1.
+}
+function calcFinalApBurn{parameter m,p.
+	local highAp is Ap > (finalAp + finalAltIsh).
+	local lowAp is Ap < (finalAp - finalAltIsh).
+	if highAp or lowAp {
+		set dv to MNV["ChangeApDeltaV"](finalAp).
+		set preburn to MNV["GetManeuverTime"](dv/2).
+		set fullburn to MNV["GetManeuverTime"](dv).
+		if highAp lock steer to RETROGRADE.
+		else lock steer to PROGRADE.
+		if ETA:periapsis - preburn > 0 {
+			set burnTime to TIME:seconds + ETA:periapsis - preburn.
+			SetAlarm(burnTime,"adjust Ap").
+			m["next"]().
+		}
+	} else m["jump"](2).
+}
+function finalApBurn{parameter m,p.
+	if Ap > finalAp-finalAltIsh and Ap < finalAp+finalAltIsh {
+		set throt to 0.
+		m["next"]().
+	}
+	else if burnEta <= 0 set throt to 1.
+}
+function calcFinalEccBurn{parameter m,p.
+	local highEcc is ecc > finalEcc.
+	local lowPe is Pe < (finalPe - finalAltIsh).
+	if highEcc or lowPe {
+		set dv to MNV["ChangePeDeltaV"](finalPe).
+		set preburn to MNV["GetManeuverTime"](dv/2, 0.2).
+		set fullburn to MNV["GetManeuverTime"](dv, 0.2).
+		if highEcc lock steer to RETROGRADE.
+		else lock steer to PROGRADE.
+		if ETA:apoapsis - preburn > 0 {
+			set burnTime to TIME:seconds + ETA:apoapsis - preburn.
+			SetAlarm(burnTime,"adjust Pe").
+			m["next"]().
+		}
+	} else m["jump"](2).
+}
+function finalEccBurn{parameter m,p.
+	if Pe > finalPe-finalAltIsh and ecc < finalEcc {
+		set throt to 0.
+		m["next"]().
+	}
+	else if burnEta <= 0 set throt to 0.2.
 }
 function done{parameter m,p.
 	lock steer to orient.
