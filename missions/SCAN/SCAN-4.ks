@@ -3,10 +3,11 @@ set MNV to import("maneuver").
 set ORB to import("orbmech").
 lock NORMALVEC to VCRS(SHIP:VELOCITY:ORBIT,-BODY:POSITION).
 lock RADIALVEC TO VXCL(PROGRADE:VECTOR, UP:VECTOR).
-function SetAlarm{parameter t,n.AddAlarm("Raw",t,n,"").}
+function SetAlarm{parameter t,n.AddAlarm("Raw",t-30,n,"margin").AddAlarm("Raw",t,n,"").}
 
+local maxAp is 498e3.
 local targetAp is 495e3.
-local targetPe is 495e3.
+local targetPe is 494e3.
 local targetEcc is 0.0021.
 local targetInc is 84.25.
 local targetIncIsh is 0.25.
@@ -17,7 +18,7 @@ local dv is 0.
 local burnTime is 0.
 
 set throt to 0.
-lock orient to UP+R(0,0,0).
+lock orient to LOOKDIRUP(V(0,1,0),SUN:position).
 lock steer to orient.
 lock burnEta to burnTime - TIME:seconds.
 lock STEERING to steer.
@@ -37,7 +38,14 @@ set steps to Lex(
 4,insertion@,
 5,calcCircularize@,
 6,circularize@,
-7,done@
+7,checkInclination@,
+8,calcInclinationBurn@,
+9,inclinationBurn@,
+10,calcApCorrection@,
+11,apCorrection@,
+12,calcPeCorrection@,
+13,peCorrection@,
+14,done@
 ).
 
 function countdown{parameter m,p.
@@ -68,13 +76,12 @@ function calcInsertion{parameter m,p.
 	set targetPe to MIN(targetPe, Ap).
 	set dv to MNV["ChangePeDeltaV"](15000).
 	set fullburn to MNV["GetManeuverTime"](dv).
-	set burnTime to TIME:seconds + ETA:apoapsis-fullburn.
+	set burnTime to TIME:seconds + ETA:apoapsis - fullburn*2.
 	SetAlarm(burnTime,"insertion").
 	m["next"]().
 }
 function insertion{parameter m,p.
-	if dv=0 m["jump"](-1).
-	else if Pe >= 15000 {
+	if Pe >= 15000 {
 		set throt to 0.
 		WAIT 1. UNTIL STAGE:NUMBER=lastStage SYS["SafeStage"]().
 		m["next"]().
@@ -85,15 +92,15 @@ function calcCircularize{parameter m,p.
 	set dv to MNV["ChangePeDeltaV"](targetPe).
 	set preburn to MNV["GetManeuverTime"](dv/2).
 	set fullburn to MNV["GetManeuverTime"](dv).
-	if ETA:apoapsis < ETA:periapsis
+	if ETA:apoapsis + preburn > 0 and ETA:apoapsis < ETA:periapsis
 		set burnTime to TIME:seconds + ETA:apoapsis-preburn.
-	else set burnTime to TIME:seconds + fullburn.
+	else set burnTime to TIME:seconds + 5.
 	SetAlarm(burnTime,"circularize").
+	set startAp to Ap.
 	m["next"]().
 }
 function circularize{parameter m,p.
-	if dv=0 m["jump"](-1).
-	else if Pe >= targetPe or burnEta + fullburn <= 0 {
+	if Pe >= targetPe or (Ap >= startAp+1e3 and Pe > BODY:ATM:height) {
 		set throt to 0.
 		m["next"]().
 	}
@@ -134,7 +141,7 @@ function inclinationBurn{parameter m,p.
 	if throt > 0 {
 		local deltaInc is round(inc - lastInc, 6).
 		local remaining is abs(inc - targetInc).
-		if (inc > targetInc-targetIncIsh and inc < targetInc+targetIncIsh) or ((inclinationChange=1 and deltaInc < 0) or (inclinationChange=-1 and deltaInc > 0)) {
+		if (inclinationChange=1 and (inc > targetInc or deltaInc < 0)) or (inclinationChange=-1 and (inc < targetInc or deltaInc > 0)) {
 			set throt to 0.
 			M["next"]().
 		}
@@ -148,7 +155,7 @@ function calcApCorrection{parameter m,p.
 		set dv to MNV["ChangeApDeltaV"](targetAp).
 		set preburn to MNV["GetManeuverTime"](dv/2, 0.2).
 		set burnTime to TIME:seconds + ETA:periapsis-preburn.
-		set steer to RETROGRADE.
+		lock steer to RETROGRADE.
 		SetAlarm(burnTime,"change Ap").
 		m["next"]().
 	} else m["jump"](2).
@@ -164,6 +171,7 @@ function calcPeCorrection{parameter m,p.
 	set targetAp to Ap.
 	set dv to MNV["ChangePeDeltaV"](targetAp).
 	set preburn to MNV["GetManeuverTime"](dv/2).
+	set fullburn to MNV["GetManeuverTime"](dv).
 	set burnTime to TIME:seconds + ETA:apoapsis-preburn.
 	if Pe > targetAp lock steer to RETROGRADE.
 	else lock steer to PROGRADE.
@@ -171,7 +179,7 @@ function calcPeCorrection{parameter m,p.
 	m["next"]().
 }
 function peCorrection{parameter m,p.
-	if Pe >= targetAp or burnEta + fullburn <= 0 {
+	if burnEta + fullburn <= 0 {
 		set throt to 0.
 		m["next"]().
 	}
