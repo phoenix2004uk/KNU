@@ -103,7 +103,7 @@ function getInclinedLaunchWindow {
 	return List(TIME:seconds + waitTime, launchHeading).
 }
 
-function SetAlarm{parameter t,n.AddAlarm("Raw",t,n,"").}
+function SetAlarm{parameter t,n.AddAlarm("Raw",t-30,n,"margin").AddAlarm("Raw",t,n,"").}
 
 set PRT to import("util/parts").
 set SYS to import("system").
@@ -215,8 +215,7 @@ function calcInsertion{parameter m,p.
 	m["next"]().
 }
 function insertion{parameter m,p.
-	if dv=0 m["jump"](-1).
-	else if Pe >= 15000 {
+	if Pe >= 15000 {
 		set throt to 0.
 		WAIT 1. UNTIL STAGE:NUMBER=lastStage SYS["SafeStage"]().
 		m["next"]().
@@ -227,15 +226,15 @@ function calcCircularize{parameter m,p.
 	set dv to MNV["ChangePeDeltaV"](targetPe).
 	set preburn to MNV["GetManeuverTime"](dv/2).
 	set fullburn to MNV["GetManeuverTime"](dv).
-	if ETA:apoapsis < ETA:periapsis
+	if ETA:apoapsis + preburn > 0 and ETA:apoapsis < ETA:periapsis
 		set burnTime to TIME:seconds + ETA:apoapsis-preburn.
-	else set burnTime to TIME:seconds + fullburn.
+	else set burnTime to TIME:seconds + 5.
+	set startAp to Ap.
 	SetAlarm(burnTime,"circularize").
 	m["next"]().
 }
 function circularize{parameter m,p.
-	if dv=0 m["jump"](-1).
-	else if Pe >= targetPe or burnEta + fullburn <= 0 {
+	if Pe >= targetPe or (Ap >= startAp+1e3 and Pe > BODY:ATM:height) {
 		set throt to 0.
 		m["next"]().
 	}
