@@ -11,7 +11,7 @@ local targetEcc is 0.0021.
 local targetInc is 84.25.
 local targetIncIsh is 0.25.
 local lastStage is 0.
-local launchHeading is 0.
+local launchHeading is targetInc+targetIncIsh.
 local counter is 10.
 local dv is 0.
 local burnTime is 0.
@@ -62,6 +62,7 @@ function inspace{parameter m,p.
 	lock steer to PROGRADE+R(0,0,0).
 	lock STEERING to steer.
 	lock THROTTLE to throt.
+	m["next"]().
 }
 function calcInsertion{parameter m,p.
 	set targetPe to MIN(targetPe, Ap).
@@ -84,7 +85,9 @@ function calcCircularize{parameter m,p.
 	set dv to MNV["ChangePeDeltaV"](targetPe).
 	set preburn to MNV["GetManeuverTime"](dv/2).
 	set fullburn to MNV["GetManeuverTime"](dv).
-	set burnTime to TIME:seconds + ETA:apoapsis-preburn.
+	if ETA:apoapsis < ETA:periapsis
+		set burnTime to TIME:seconds + ETA:apoapsis-preburn.
+	else set burnTime to TIME:seconds + fullburn.
 	SetAlarm(burnTime,"circularize").
 	m["next"]().
 }
@@ -176,5 +179,11 @@ function peCorrection{parameter m,p.
 }
 function done{parameter m,p.
 	lock steer to orient.
+	local scanner is SHIP:PartsNamed("SCANsat.Scanner24")[0].
+	local scannerModule is scanner:GetModule("SCANsat").
+	Notify("Deploying "+scanner:TITLE).
+	scannerModule:DoEvent("start scan: multispectral").
+	WAIT 10.
+	Notify("SCANsat Altitude: " + scannerModule:GetField("scansat altitude")).
 	m["next"]().
 }

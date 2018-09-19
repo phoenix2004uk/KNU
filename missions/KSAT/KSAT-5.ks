@@ -204,6 +204,7 @@ function inspace{parameter m,p.
 	lock steer to PROGRADE+R(0,0,0).
 	lock STEERING to steer.
 	lock THROTTLE to throt.
+	m["next"]().
 }
 function calcInsertion{parameter m,p.
 	set targetPe to MIN(parkingAp, Ap).
@@ -226,7 +227,9 @@ function calcCircularize{parameter m,p.
 	set dv to MNV["ChangePeDeltaV"](targetPe).
 	set preburn to MNV["GetManeuverTime"](dv/2).
 	set fullburn to MNV["GetManeuverTime"](dv).
-	set burnTime to TIME:seconds + ETA:apoapsis-preburn.
+	if ETA:apoapsis < ETA:periapsis
+		set burnTime to TIME:seconds + ETA:apoapsis-preburn.
+	else set burnTime to TIME:seconds + fullburn.
 	SetAlarm(burnTime,"circularize").
 	m["next"]().
 }
