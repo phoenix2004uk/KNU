@@ -11,7 +11,7 @@ local targetEcc is 0.0021.
 local targetInc is 84.25.
 local targetIncIsh is 0.25.
 local lastStage is 0.
-local launchHeading is targetInc+targetIncIsh.
+local launchHeading is 90-(targetInc+targetIncIsh).
 local counter is 10.
 local dv is 0.
 local burnTime is 0.
