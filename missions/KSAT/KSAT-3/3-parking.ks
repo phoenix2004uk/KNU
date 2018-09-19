@@ -77,7 +77,7 @@ function correctInc{parameter M,P.
 		print "burn: "+round(dv,2)+"m/s in "+round(fullburn,2)+"s ("+round(preburn,2)+"s)" at (0,2).
 		set lastInc to inc.
 		M["next"]().
-	} else M["jump"](3).
+	} else M["jump"](2).
 }
 function burnInc{parameter M,P.
 	print "burntime: " + round(eta_burn+fullburn,3) + "s" at (0,0).
@@ -107,7 +107,7 @@ function correctAp{PARAMETER M,P.
 		set fullburn to MNV["GetManeuverTime"](dv).
 		print "burn: "+round(dv,2)+"m/s in "+round(fullburn,2)+"s ("+round(preburn,2)+"s)" at (0,6).
 		M["next"]().
-	} else M["jump"](3).
+	} else M["jump"](2).
 }
 function burnAp{PARAMETER M,P.
 	print "burntime: " + round(eta_burn+fullburn,3) + "s" at (0,0).
@@ -136,7 +136,7 @@ function correctEcc{PARAMETER M,P.
 		print "burn: "+round(dv,2)+"m/s in "+round(fullburn,2)+"s ("+round(preburn,2)+"s)" at (0,10).
 		set lastEcc to ecc.
 		M["next"]().
-	} else M["jump"](3).
+	} else M["jump"](2).
 }
 function burnEcc{PARAMETER M,P.
 	print "burntime: " + round(eta_burn+fullburn,3) + "s" at (0,0).
