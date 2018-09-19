@@ -105,6 +105,7 @@ function getInclinedLaunchWindow {
 
 function SetAlarm{parameter t,n.AddAlarm("Raw",t-30,n,"margin").AddAlarm("Raw",t,n,"").}
 
+
 set PRT to import("util/parts").
 set SYS to import("system").
 set MNV to import("maneuver").
@@ -115,77 +116,102 @@ lock RADIALVEC TO VXCL(PROGRADE:VECTOR, UP:VECTOR).
 
 wait until SHIP=KUNIVERSE:activeVessel.
 
-local parkingAp is 100e3.
-local minmusParkingAlt is 100e3.
-local minmusParkingInc is 0.1.
-local targetAp is 440e3.
-local targetSMA is 500e3.
+lock orient to PROGRADE+R(0,0,0).
+local launchAlt is 100e3.
 local lastStage is 0.
 local launchHeading is 90.
 local counter is 10.
+
+local targetBody is Minmus.
+local maxRelativeInclination is 0.01.
+local targetParkingAlt is 100e3.
+local targetParkingEcc is 0.001.
+local targetParkingInc is 0.1.
+local targetOrbitAp is 440e3.
+local targetOrbitSMA is 500e3.
+
+local allCallsigns is List("Deino","Enyo","Pemphredo").
+local callsign is GetCallsign().
+local separation_angle is 360 / allCallsigns:length.
+local satID is 0.
+local targetID is -1.
+function satExists {
+	parameter callsign.
+	list TARGETS in allTargets.
+	local iter is allTargets:iterator.
+	until not iter:next {
+		if iter:value:name = "KSAT - Minmus '"+callsign+"'" return TRUE.
+	}
+	return FALSE.
+}
+function getSatellite {
+	parameter index.
+	return Vessel("KSAT - Minmus '"+allCallsigns[index]+"'").
+}
+
 local dv is 0.
 local burnTime is 0.
 set throt to 0.
-lock orient to PROGRADE+R(0,0,0).
 lock steer to orient.
 lock burnEta to burnTime - TIME:seconds.
 lock STEERING to steer.
 lock THROTTLE to throt.
-
 lock Ap to ALT:apoapsis.
 lock Pe to ALT:periapsis.
 lock sma to SHIP:OBT:semiMajorAxis.
 lock inc to SHIP:OBT:inclination.
 lock ecc to SHIP:OBT:eccentricity.
 
-local allCallsigns is List("Deino","Enyo","Pemphredo").
-local callsign is GetCallsign().
-set SHIP:name to "KSAT - Minmus '"+callsign+"'".
-local isFirst is callsign=allCallsigns[0].
-local separation_angle is 360 / allCallsigns:length.
 
 set steps to Lex(
-0,countdown@,
-1,launch@,
-2,inspace@,
-3,calcInsertion@,
-4,insertion@,
-5,calcCircularize@,
-6,circularize@,
-7,calcTransferInclinationBurn@,
-8,transferInclinationBurn@,
-9,calcMinmusTransfer@,
-10,minmusTransfer@,
-11,tuneTransfer@,
-12,coastToMinmus@,
-13,calcMinmusCapture@,
-14,minmusCapture@,
-15,calcParkingInclinationBurn@,
-16,parkingInclinationBurn@,
-17,waitForAll@,
-18,calcTransfer@,
-19,transfer@,
-20,calcFinalBurn@,
-21,finalBurn@,
-22,adjustSMA@,
-23,done@
+0,init@,
+1,countdown@,
+2,launch@,
+3,inspace@,
+4,calcInsertion@,
+5,insertion@,
+6,calcCircularize@,
+7,circularize@,
+8,calcTransferInclinationBurn@,
+9,transferInclinationBurn@,
+10,calcMinmusTransfer@,
+11,minmusTransfer@,
+12,tuneTransfer@,
+13,coastToMinmus@,
+14,calcMinmusCapture@,
+15,minmusCapture@,
+16,calcParkingInclinationBurn@,
+17,parkingInclinationBurn@,
+18,waitForAll@,
+19,calcTransfer@,
+20,transfer@,
+21,calcFinalBurn@,
+22,finalBurn@,
+23,prepareFinalAdjustment@,
+24,adjustSMA@,
+25,done@
 ).
 
-if not isFirst {
-	set first to Vessel("KSAT - Minmus '"+allCallsigns[0]+"'").
-	local iter is allCallsigns:iterator.
-	until not iter:next if callsign=iter:value set TARGET to Vessel("KSAT - Minmus '"+allCallsigns[iter:index-1]+"'").
+function init{parameter m,p.
+	set SHIP:name to "KSAT - Minmus '"+callsign+"'".
+	until satID = allCallsigns:length if callsign = allCallsigns[satID] break. else set satID to satID + 1.
+	set targetID is satID - 1.
+	if satID = allCallsigns:length {
+		Notify("unknown callsign: " + callsign).
+		m["end"]().
+		return.
+	}
+
+	local launchWindow is getInclinedLaunchWindow(targetBody).
+	lock launchCountdown to launchWindow[0] - TIME:seconds.
+	set launchHeading to launchWindow[1].
+	SetAlarm(launchWindow,"launch").
+	m["next"]().
 }
-
-local launchWindow is getInclinedLaunchWindow(Minmus).
-lock launchCountdown to launchWindow[0] - TIME:seconds.
-set launchHeading to launchWindow[1].
-SetAlarm(launchWindow,"launch").
-
 function countdown{parameter m,p.
 	if launchCountdown = 0 {
 		Notify("Launch").
-		set ascent to import("prg/asc")["new"](Lex("heading",launchHeading,"lastStage",lastStage,"alt",parkingAp)).
+		set ascent to import("prg/asc")["new"](Lex("heading",launchHeading,"lastStage",lastStage,"alt",launchAlt)).
 		m["next"]().
 	}
 	else {
@@ -207,7 +233,6 @@ function inspace{parameter m,p.
 	m["next"]().
 }
 function calcInsertion{parameter m,p.
-	set targetPe to MIN(parkingAp, Ap).
 	set dv to MNV["ChangePeDeltaV"](15000).
 	set fullburn to MNV["GetManeuverTime"](dv).
 	set burnTime to TIME:seconds + ETA:apoapsis-fullburn.
@@ -223,74 +248,108 @@ function insertion{parameter m,p.
 	else if burnEta<=0 set throt to 1.
 }
 function calcCircularize{parameter m,p.
-	set dv to MNV["ChangePeDeltaV"](targetPe).
+	set dv to MNV["ChangePeDeltaV"](Ap).
 	set preburn to MNV["GetManeuverTime"](dv/2).
 	set fullburn to MNV["GetManeuverTime"](dv).
-	if ETA:apoapsis + preburn > 0 and ETA:apoapsis < ETA:periapsis
-		set burnTime to TIME:seconds + ETA:apoapsis-preburn.
+	if ETA:apoapsis > preburn and ETA:apoapsis < ETA:periapsis
+		set burnTime to TIME:seconds + ETA:apoapsis - preburn.
 	else set burnTime to TIME:seconds + 5.
-	set startAp to Ap.
 	SetAlarm(burnTime,"circularize").
 	m["next"]().
 }
 function circularize{parameter m,p.
-	if Pe >= targetPe or (Ap >= startAp+1e3 and Pe > BODY:ATM:height) {
+	if Pe > BODY:ATM:height and burnEta + fullburn <= 0 {
 		set throt to 0.
 		m["next"]().
 	}
 	else if burnEta<=0 set throt to 1.
 }
 function calcTransferInclinationBurn{parameter m,p.
-	local relNodes is anomaly_of_relative_nodes(Minmus).
+	local relNodes is anomaly_of_relative_nodes(targetBody).
 	local whichNode is relNodes["next"].
 	local anomalyNextNode is relNodes[whichNode].
 	local altNextNode is ORB["Rt"](anomalyNextNode).
 	local etaNextNode is ORB["eta"](anomalyNextNode).
-	set dv to 2*MNV["VisViva"](sma, altNextNode)*SIN(relativeInclination()/2).
+	set dv to 2*MNV["VisViva"](sma, altNextNode)*SIN(relativeInclination(targetBody)/2).
 	set preburn to MNV["GetManeuverTime"](dv/2).
-	//set fullburn to MNV["GetManeuverTime"](dv).
-	set burnTime to TIME:seconds + etaNextNode - preburn.
-	if whichNode="AN" lock steer to -NORMALVEC.
-	else lock steer to NORMALVEC.
-	SetAlarm(burnTime,"match inclination").
-	m["next"].
+	set fullburn to MNV["GetManeuverTime"](dv).
+	if etaNextNode > preburn + 10 {
+		set burnTime to TIME:seconds + etaNextNode - preburn.
+		if whichNode="AN" lock steer to -NORMALVEC.
+		else lock steer to NORMALVEC.
+		SetAlarm(burnTime,"match inclination").
+		m["next"]().
+	}
 }
 function transferInclinationBurn{parameter m,p.
-	if relativeInclination() < 0.01 or burnEta + fullburn <= 0 {
-		set throt to 0.
-		m["next"]().
+	if dv=0 {m["jump"](-1).return.}
+
+	if burnEta < 30 lock STEERING to steer.
+	else lock STEERING to orient.
+	if burnEta > 0 return.
+
+	local theta is round(relativeInclination(targetBody),4).
+	if throt > 0 {
+		if theta < maxRelativeInclination {
+			set throt to 0.
+			m["next"]().
+		}
+		else if theta > lastValue {
+			set throt to 0.
+			m["jump"](-1).
+		}
 	}
-	else if burnEta <= 0 set throt to 1.
+	else set throt to min(1,max(0.01,theta).
+	set lastValue to round(theta,4).
 }
 function calcMinmusTransfer{parameter m,p.
-	set dv to MNV["ChangeApDeltaV"](Minmus:altitude).
+	set dv to MNV["ChangeApDeltaV"](targetBody:altitude).
 	set preburn to MNV["GetManeuverTime"](dv/2).
-	local transferAnomaly to RDV["VTransferCirc"](0, Minmus).
-	set burnTime to TIME:seconds + RDV["etaTransferCirc"](transferAnomaly, Minmus) - preburn.
-	SetAlarm(burnTime,"transfer").
-}
-function minmusTransfer{parameter m,p.
-	if SHIP:OBT:hasNextPatch and SHIP:OBT:nextPatch:body = Minmus {
-		set throt to 0.2.
+	set fullburn to MNV["GetManeuverTime"](dv).
+	local transferAnomaly is RDV["VTransferCirc"](0, targetBody).
+	local etaTransfer is RDV["etaTransferCirc"](transferAnomaly, targetBody).
+	if etaTransfer > preburn + 10 {
+		set TARGET to targetBody.
+		set burnTime to TIME:seconds + etaTransfer - preburn.
+		lock steer to PROGRADE.
+		SetAlarm(burnTime,"transfer").
 		m["next"]().
 	}
-	else if Ap > Minmus:altitude + Minmus:soiRadius {
+}
+function minmusTransfer{parameter m,p.
+	if dv=0 {m["jump"](-1).return.}
+
+	if burnEta < 30 lock STEERING to steer.
+	else lock STEERING to orient.
+	if burnEta > 0 return.
+
+	if throt > 0 {
+		if SHIP:OBT:hasNextPatch and SHIP:OBT:nextPatch:body = targetBody {
+			set throt to 0.2.
+			m["next"]().
+		}
+		else if Ap > targetBody:altitude + targetBody:soiRadius {
+			set throt to 0.
+			Notify("no encounter").
+			m["end"]().
+		}
+	}
+	else set throt to 1.
+}
+function tuneTransfer{parameter m,p.
+	if not SHIP:OBT:hasNextPatch {
 		set throt to 0.
 		m["end"]().
 	}
-	else if burnEta <= 0 set throt to 1.
-}
-function tuneTransfer{parameter m,p.
-	if not SHIP:OBT:hasNextPatch m["end"]().
-	else if SHIP:OBT:nextPatch:periapsis < minmusParkingAlt {
+	else if SHIP:OBT:nextPatch:periapsis < targetParkingAlt {
 		set throt to 0.
-		SetAlarm(TIME:seconds+SHIP:OBT:nextPatchEta,"Minmus SOI").
+		SetAlarm(TIME:seconds+SHIP:OBT:nextPatchEta, targetBody:name+" SOI").
 		m["next"]().
 	}
 }
 function coastToMinmus{parameter m,p.
 	lock steer to orient.
-	if BODY = Minmus {
+	if BODY = targetBody {
 		local rt is "ModuleRTAntenna".
 		PRT["DoModuleEvent"](rt,"activate").
 		PRT["SetPartModuleField"]("mediumDishAntenna",rt,"target",Kerbin).
@@ -300,126 +359,181 @@ function coastToMinmus{parameter m,p.
 }
 function calcMinmusCapture{parameter m,p.
 	local vpe is MNV["VisViva"](sma, Pe).
-	local vca is MNV["VisViva"]((Pe + minmusParkingAlt)/2+Minmus:radius, Pe).
+	local vca is MNV["VisViva"]((Pe + targetParkingAlt)/2+targetBody:radius, Pe).
 	set dv to vpe - vca.
 	set preburn to MNV["GetManeuverTime"](dv/2).
-	set burnTime to TIME:seconds + ETA:periapsis-preburn.
+	set fullburn to MNV["GetManeuverTime"](dv).
+	if ETA:transition < ETA:periapsis or ETA:periapsis < 0
+		set burnTime to TIME:seconds + 10.
+	else
+		set burnTime to TIME:seconds + ETA:periapsis - preburn.
 	lock steer to RETROGRADE.
 	SetAlarm(burnTime,"capture").
 	m["next"]().
 }
 function minmusCapture{parameter m,p.
-	if Ap > 0 and Ap < minmusParkingAlt {
-		set throt to 0.
-		m["next"]().
-	}
-	else if burnEta <= 0 set throt to 1.
+	if dv=0 {m["jump"](-1).return.}
+
+	if burnEta < 30 lock STEERING to steer.
+	else lock STEERING to orient.
+	if burnEta > 0 return.
+
+	local x is round(ecc,6).
+	if throt > 0 {
+		if Ap > targetBody:radius and (x < targetParkingEcc or x > lastValue) {
+			set throt to 0.
+			m["next"]().
+		}
+	} else set throt to 1.
+	set lastValue to round(ecc,6).
 }
 function calcParkingInclinationBurn{parameter m,p.
-	if inc > minmusParkingInc {
+	if inc > targetParkingInc {
 		local Ran is ORB["Rt"](ORB["Van"]()).
 		local Rdn is ORB["Rt"](ORB["Vdn"]()).
 		local vnode is 0.
+		local whichNode is "".
 		if Ran > Rdn {
 			lock steer to -NORMALVEC.
-			set burnTime to TIME:SECONDS + ORB["etaAN"]().
+			set whichNode to "AN".
 			set vnode to MNV["VisViva"](sma,Ran).
 		}
 		else {
 			lock steer to NORMALVEC.
-			set burnTime to TIME:SECONDS + ORB["etaDN"]().
+			set whichNode to "DN".
 			set vnode to MNV["VisViva"](sma,Rdn).
 		}
 		set dv to 2*vnode*SIN(inc/2).
 		set preburn to MNV["GetManeuverTime"](dv/2).
-		set lastInc to inc.
-		M["next"]().
+		set fullburn to MNV["GetManeuverTime"](dv).
+		local etaNode is ORB["eta" + whichNode]().
+		if etaNode > preburn + 10 {
+			set burnTime to TIME:SECONDS + etaNode - preburn.
+			M["next"]().
+		}
 	} else M["jump"](2).
 }
 function parkingInclinationBurn{parameter m,p.
+	if dv=0 {m["jump"](-1).return.}
+
+	if burnEta < 30 lock STEERING to steer.
+	else lock STEERING to orient.
+	if burnEta > 0 return.
+
+	local theta is round(inc,4).
 	if throt > 0 {
-		if inc < minmusParkingInc or round(inc - lastInc,6) > 0 {
+		if theta < targetParkingInc {
 			set throt to 0.
-			M["next"]().
-		}
-		else if inc < maxInc*10 set throt to 0.1.
-		else if inc < maxInc*2 set throt to 0.01.
-	}
-	else if burnEta <= 0 set throt to 1.
-	set lastInc to inc.
-}
-function waitForAll{parameter m,p.
-	LIST TARGETS in allTargets.
-	local outer is allTargets:iterator.
-	local allInOrbit is 0.
-	until not outer:next {
-		local inner is allCallsigns:iterator.
-		until not inner:next {
-			local name is "KSAT - Minmus '"+inner:value+"'".
-			if outer:value:name = name {
-				local vsl is Vessel(name).
-				if vsl:OBT:BODY=Minmus and vsl:OBT:apoapsis > 0 set allInOrbit to allInOrbit + 1.
-			}
-		}
-	}
-	if allInOrbit = allCallsigns:length-1 {
-		if isFirst m["next"]().
-		else if TARGET:OBT:body=Minmus and TARGET:OBT:semiMajorAxis > targetSMA*0.9 {
-			set targetSMA to first:OBT:semiMajorAxis.
 			m["next"]().
 		}
+		else if theta > lastValue {
+			set throt to 0.
+			m["jump"](-1).
+		}
 	}
-	wait 10.
+	else set throt to min(1,max(0.01,theta).
+	set lastValue to round(theta,4).
 }
-function calcTransfer{parameter m,p.
-	set dv to MNV["ChangeApDeltaV"](targetAp).
-	set preburn to MNV["GetManeuverTime"](dv/2).
-	if isFirst set burnTime to TIME:seconds + ETA:periapsis-preburn.
-	else {
-		local transfer_anomaly to RDV["VTransferCirc"](separation_angle).
-		set burnTime to TIME:seconds + RDV["etaTransferCirc"](transfer_anomaly)-preburn.
+function waitForAll{parameter m,p.
+
+	lock steer to orient.
+	wait 60.
+
+	local iter is allCallsigns:iterator.
+	until not iter:next {
+		if iter:value <> callsign {
+			if not satExists(iter:value) return.
+			local sat is getSatellite(iter:index).
+			if sat:body <> targetBody return.
+			if sat:OBT:apoapsis < 0 return.
+		}
 	}
-	SetAlarm(burnTime,"transfer").
+
+	if satID>0 {
+		local targetSat is getSatellite(targetID).
+		if targetSat:OBT:semiMajorAxis < targetOrbitSMA*0.9 return.
+
+		set targetOrbitSMA to getSatellite(0):OBT:semiMajorAxis.
+		set TARGET to targetSat.
+	}
+
 	m["next"]().
 }
-function transfer{parameter m,p.
-	if dv=0 m["jump"](-1).
-	else if Ap >= targetAp {
-		set throt to 0.
+function calcTransfer{parameter m,p.
+	set dv to MNV["ChangeApDeltaV"](targetOrbitAp).
+	set preburn to MNV["GetManeuverTime"](dv/2).
+	set fullburn to MNV["GetManeuverTime"](dv).
+
+	local etaTransfer is ETA:periapsis.
+	if satID>0 {
+		local transfer_anomaly to RDV["VTransferCirc"](separation_angle).
+		set etaTransfer to RDV["etaTransferCirc"](transfer_anomaly).
+	}
+	if etaTransfer > preburn + 10 {
+		set burnTime to tIME:seconds + etaTransfer - preburn.
+		lock steer to PROGRADE.
+		SetAlarm(burnTime,"transfer").
 		m["next"]().
 	}
-	else if throt=1 and Ap >= targetAp*0.95 {
-		lock throt to max(0.01, min(0.1, 0.1 - (Ap-targetAp*0.95)/(targetAp*0.5))).
+}
+function transfer{parameter m,p.
+	if dv=0 {m["jump"](-1).return.}
+
+	if burnEta < 30 lock STEERING to steer.
+	else lock STEERING to orient.
+	if burnEta > 0 return.
+
+	if throt > 0 {
+		if Ap >= targetOrbitAp {
+			set throt to 0.
+			m["next"]().
+		}
+		else if throt=1 and Ap >= targetOrbitAp*0.95 {
+			lock throt to max(0.01, min(0.1, 0.1 - (Ap-targetOrbitAp*0.95)/(targetOrbitAp*0.5))).
+		}
 	}
-	else if throt=0 and burnEta<=0 set throt to 1.
+	else if burnEta <= 0 set throt to 1.
 }
 function calcFinalBurn{parameter m,p.
-	set dv to MNV["ChangePeDeltaV"](min(targetAp,Ap)).
+	set dv to MNV["ChangePeDeltaV"](min(targetOrbitAp,Ap)).
 	set preburn to MNV["GetManeuverTime"](dv/2).
-	set burnTime to TIME:seconds + ETA:apoapsis-preburn.
+	set fullburn to MNV["GetManeuverTime"](dv).
+	set burnTime to TIME:seconds + ETA:apoapsis - preburn.
+	lock steer to PROGRADE.
 	SetAlarm(burnTime,"finalize").
 	m["next"]().
 }
 function finalBurn{parameter m,p.
-	if dv=0 m["jump"](-1).
-	else if sma >= targetSMA {
-		set throt to 0.
-		m["next"]().
+	if dv=0 {m["end"](). Notify("failed to reach orbit"). return.}
+
+	if burnEta < 30 lock STEERING to steer.
+	else lock STEERING to orient.
+	if burnEta > 0 return.
+
+	if throt > 0 {
+		if sma >= targetOrbitSMA {
+			set throt to 0.
+			m["next"]().
+		}
+		else if throt=1 and sma >= targetOrbitSMA*0.95 {
+			lock throt to max(0.01, min(0.1, 0.1 - (sma-targetOrbitSMA*0.95)/(targetOrbitSMA*0.5))).
+		}
 	}
-	else if throt=1 and sma >= targetSMA*0.95 {
-		lock throt to max(0.01, min(0.1, 0.1 - (sma-targetSMA*0.95)/(targetSMA*0.5))).
-	}
-	else if throt=0 and burnEta<=0 set throt to 1.
+	else if burnEta <= 0 set throt to 1.
+}
+function prepareFinalAdjustment{parameter m,p.
+	MNV["Steer"](RETROGRADE).
+	wait 10.
+	m["next"]().
 }
 function adjustSMA{parameter m,p.
-	MNV["Steer"](RETROGRADE).
-	if sma > targetSMA set throt to 0.001.
+	if sma > targetOrbitSMA set throt to 0.001.
 	else {
 		set throt to 0.
 		m["next"]().
 	}
 }
 function done{parameter m,p.
-	lock steer to orient.
+	lock STEERING to orient.
 	m["next"]().
 }
