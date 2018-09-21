@@ -53,7 +53,8 @@
 	}
 
 	export(Lex(
-		"version", "1.0.5",
+		"version", "1.1.0",
+		"U0", solar_anomaly@,
 		"VTransferCirc", anomaly_of_transfer_circ@,
 		"etaTransferCirc", eta_to_transfer_circ@
 	)).

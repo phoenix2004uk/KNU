@@ -98,29 +98,38 @@ function getInclinedLaunchWindow {
 	set deltaLng to deltaLng - ascent_time_mins/2 * launchBodyRotationRate.
 
 	// how long till the launch window
-	local waitTime is deltaLng * launchBodyRotationRate.
+	local waitTime is deltaLng / launchBodyRotationRate.
 
-	return List(TIME:seconds + waitTime, launchHeading).
+	return List(waitTime + TIME:seconds, launchHeading).
 }
 
 function SetAlarm{parameter t,n.AddAlarm("Raw",t-30,n,"margin").AddAlarm("Raw",t,n,"").}
-
 
 set PRT to import("util/parts").
 set SYS to import("system").
 set MNV to import("maneuver").
 set ORB to import("orbmech").
 set RDV to import("rendezvous").
+
 lock NORMALVEC to VCRS(SHIP:VELOCITY:ORBIT,-BODY:POSITION).
 lock RADIALVEC TO VXCL(PROGRADE:VECTOR, UP:VECTOR).
 
 wait until SHIP=KUNIVERSE:activeVessel.
+wait until SHIP:unpacked.
 
-lock orient to PROGRADE+R(0,0,0).
+lock orient to LOOKDIRUP(V(0,1,0),SUN:position).
 local launchAlt is 100e3.
 local lastStage is 0.
+local insertionStage is 1.
 local launchHeading is 90.
 local counter is 10.
+
+function munOccludesMinmusTransfers {
+	local U0_mun is RDV["U0"](Mun).
+	local U0_minmus is RDV["U0"](Minmus).
+	local U0_delta is U0_mun - U0_minmus.
+	return U0_delta >= -15 and U0_delta <= 30 .
+}
 
 local targetBody is Minmus.
 local maxRelativeInclination is 0.01.
@@ -134,7 +143,9 @@ local allCallsigns is List("Deino","Enyo","Pemphredo").
 local callsign is GetCallsign().
 local separation_angle is 360 / allCallsigns:length.
 local satID is 0.
-local targetID is -1.
+until satID = allCallsigns:length if callsign = allCallsigns[satID] break. else set satID to satID + 1.
+set targetID to satID - 1.
+set TARGET to targetBody.
 function satExists {
 	parameter callsign.
 	list TARGETS in allTargets.
@@ -193,34 +204,37 @@ set steps to Lex(
 ).
 
 function init{parameter m,p.
+	clearscreen.
 	set SHIP:name to "KSAT - Minmus '"+callsign+"'".
-	until satID = allCallsigns:length if callsign = allCallsigns[satID] break. else set satID to satID + 1.
-	set targetID is satID - 1.
 	if satID = allCallsigns:length {
 		Notify("unknown callsign: " + callsign).
 		m["end"]().
 		return.
 	}
-
 	local launchWindow is getInclinedLaunchWindow(targetBody).
-	lock launchCountdown to launchWindow[0] - TIME:seconds.
-	set launchHeading to launchWindow[1].
-	SetAlarm(launchWindow,"launch").
-	m["next"]().
+	if launchWindow[0] - counter > TIME:seconds {
+		lock launchCountdown to launchWindow[0] - TIME:seconds.
+		set launchHeading to launchWindow[1].
+		SetAlarm(launchWindow[0],"launch").
+		m["next"]().
+	}
 }
 function countdown{parameter m,p.
-	if launchCountdown = 0 {
+	if ceiling(launchCountdown) <= 0 {
 		Notify("Launch").
 		set ascent to import("prg/asc")["new"](Lex("heading",launchHeading,"lastStage",lastStage,"alt",launchAlt)).
 		m["next"]().
 	}
 	else {
-		if launchCountdown - counter <= 10 Notify("T-"+counter).
+		if ceiling(launchCountdown) <= counter Notify("T-"+ceiling(launchCountdown)).
 		wait 1.
 	}
 }
 function launch{parameter m,p.
-	if ascent() m["next"]().
+	if ascent() {
+		WAIT 1. UNTIL STAGE:NUMBER=insertionStage SYS["SafeStage"]().
+		m["next"]().
+	}
 }
 function inspace{parameter m,p.
 	purge("prg/asc").
@@ -299,7 +313,7 @@ function transferInclinationBurn{parameter m,p.
 			m["jump"](-1).
 		}
 	}
-	else set throt to min(1,max(0.01,theta).
+	else set throt to min(1,max(0.01,theta)).
 	set lastValue to round(theta,4).
 }
 function calcMinmusTransfer{parameter m,p.
@@ -308,13 +322,13 @@ function calcMinmusTransfer{parameter m,p.
 	set fullburn to MNV["GetManeuverTime"](dv).
 	local transferAnomaly is RDV["VTransferCirc"](0, targetBody).
 	local etaTransfer is RDV["etaTransferCirc"](transferAnomaly, targetBody).
-	if etaTransfer > preburn + 10 {
-		set TARGET to targetBody.
-		set burnTime to TIME:seconds + etaTransfer - preburn.
-		lock steer to PROGRADE.
-		SetAlarm(burnTime,"transfer").
-		m["next"]().
-	}
+	lock STEERING to orient.
+	if munOccludesMinmusTransfers() return.
+	if etaTransfer < preburn + 10 return.
+	set burnTime to TIME:seconds + etaTransfer - preburn.
+	lock steer to PROGRADE.
+	SetAlarm(burnTime,"transfer").
+	m["next"]().
 }
 function minmusTransfer{parameter m,p.
 	if dv=0 {m["jump"](-1).return.}
@@ -325,7 +339,7 @@ function minmusTransfer{parameter m,p.
 
 	if throt > 0 {
 		if SHIP:OBT:hasNextPatch and SHIP:OBT:nextPatch:body = targetBody {
-			set throt to 0.2.
+			set throt to 0.05.
 			m["next"]().
 		}
 		else if Ap > targetBody:altitude + targetBody:soiRadius {
@@ -350,9 +364,6 @@ function tuneTransfer{parameter m,p.
 function coastToMinmus{parameter m,p.
 	lock steer to orient.
 	if BODY = targetBody {
-		local rt is "ModuleRTAntenna".
-		PRT["DoModuleEvent"](rt,"activate").
-		PRT["SetPartModuleField"]("mediumDishAntenna",rt,"target",Kerbin).
 		WAIT 30.
 		m["next"]().
 	}
@@ -409,6 +420,7 @@ function calcParkingInclinationBurn{parameter m,p.
 		local etaNode is ORB["eta" + whichNode]().
 		if etaNode > preburn + 10 {
 			set burnTime to TIME:SECONDS + etaNode - preburn.
+			SetAlarm(burnTime,"inclination change").
 			M["next"]().
 		}
 	} else M["jump"](2).
@@ -431,7 +443,7 @@ function parkingInclinationBurn{parameter m,p.
 			m["jump"](-1).
 		}
 	}
-	else set throt to min(1,max(0.01,theta).
+	else set throt to min(1,max(0.01,theta)).
 	set lastValue to round(theta,4).
 }
 function waitForAll{parameter m,p.
@@ -466,7 +478,7 @@ function calcTransfer{parameter m,p.
 
 	local etaTransfer is ETA:periapsis.
 	if satID>0 {
-		local transfer_anomaly to RDV["VTransferCirc"](separation_angle).
+		local transfer_anomaly is RDV["VTransferCirc"](separation_angle).
 		set etaTransfer to RDV["etaTransferCirc"](transfer_anomaly).
 	}
 	if etaTransfer > preburn + 10 {
@@ -535,5 +547,8 @@ function adjustSMA{parameter m,p.
 }
 function done{parameter m,p.
 	lock STEERING to orient.
+	local rt is "ModuleRTAntenna".
+	PRT["DoModuleEvent"](rt,"activate").
+	PRT["SetPartModuleField"]("mediumDishAntenna",rt,"target",Kerbin).
 	m["next"]().
 }
