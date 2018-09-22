@@ -1,115 +1,10 @@
-// finds the relative AN/DN between 2 orbitables
-// returns a Lexicon with keys "AN","DN","next","other"
-//  - AN/DN: the true anomaly of the AN/DN nodes
-//  - next: either "AN" or "DN" depending which is the next node
-//  - other: the opposite of next
-function anomaly_of_relative_nodes {
-	parameter target_orbitable is TARGET, source_orbitable is SHIP.
-
-	local src_r is source_orbitable:position - BODY:position.
-	local src_v is source_orbitable:velocity:orbit.
-
-	local tgt_r is target_orbitable:position - BODY:position.
-	local tgt_v is target_orbitable:velocity:orbit.
-
-	// angular momentum
-	// h = r x v
-	local src_h is VCRS(src_r,src_v).
-	local tgt_h is VCRS(tgt_r,tgt_v).
-
-	// line of nodes
-	local v_nodes is VCRS(src_h, tgt_h).
-
-	// vector normal of line of nodes and position vector
-	local v_nodes_normal is VCRS(src_h, v_nodes).
-
-	// angle between nodes normal and position tells us which half of the orbit we are in
-	local ang_position is VANG(src_r, v_nodes_normal).
-
-	// angle between current position and line of nodes is the AN
-	local ang_to_an is VANG(v_nodes,src_r).
-	local ang_to_dn is VANG(-v_nodes,src_r).
-
-	local result is Lex().
-	// since angle to AN/DN is relative, depending on which half of the orbit we are in
-	// we need to add twice the angle difference of the next node to the other node
-	// now we know which node is the next node
-	if ang_position > 90 {
-		set ang_to_dn to ang_to_dn + 2*ang_to_an.
-		set result["next"] to "AN".
-		set result["other"] to "DN".
-	}
-	else {
-		set ang_to_an to ang_to_an + 2*ang_to_dn.
-		set result["next"] to "DN".
-		set result["other"] to "AN".
-	}
-	set result["AN"] to mod(360+source_orbitable:OBT:trueAnomaly+ang_to_an,360).
-	set result["DN"] to mod(360+source_orbitable:OBT:trueAnomaly+ang_to_dn,360).
-
-	return result.
-}
-
-// finds the relative inclination between 2 orbitables
-function relativeInclination {
-	parameter target_orbitable is TARGET, source_orbitable is SHIP.
-
-	local src_r is source_orbitable:position - BODY:position.
-	local src_v is source_orbitable:velocity:orbit.
-
-	local tgt_r is target_orbitable:position - BODY:position.
-	local tgt_v is target_orbitable:velocity:orbit.
-
-	// angular momentum
-	// h = r x v
-	local src_h is VCRS(src_r,src_v).
-	local tgt_h is VCRS(tgt_r,tgt_v).
-
-	return VANG(src_h, tgt_h).
-}
-
-// returns a List(launchTime, launchHeading) to launch into the plane of a target orbitable
-// ascent_time_mins: how long (in mins) to get into orbit - used to offset the launchTime
-function getInclinedLaunchWindow {
-	parameter target_orbitable, ascent_time_mins is 3.
-
-	local deltaLng is 0.
-	local launchHeading is 90.
-	local currentLng is BODY:rotationAngle + SHIP:geoPosition:LNG.
-	local targetAN is target_orbitable:OBT:LAN.
-	local targetDN is targetAN + 180.
-
-	// make sure AN/DN are ahead of us
-	if targetAN < currentLng set targetAN to targetAN + 360.
-	if targetDN < currentLng set targetDN to targetDN + 360.
-
-	// use whichever node is closer
-	if targetAN < targetDN {
-		set deltaLng to targetAN - currentLng.
-		set launchHeading to 90-target_orbitable:OBT:inclination.
-	}
-	else {
-		set deltaLng to targetDN - currentLng.
-		set launchHeading to 90+target_orbitable:OBT:inclination.
-	}
-
-	// take into account launch body rotation during ascent
-	local launchBodyRotationRate is 360 / BODY:rotationPeriod.
-	set deltaLng to deltaLng - ascent_time_mins/2 * launchBodyRotationRate.
-
-	// how long till the launch window
-	local waitTime is deltaLng / launchBodyRotationRate.
-
-	return List(waitTime + TIME:seconds, launchHeading).
-}
-
-function SetAlarm{parameter t,n.AddAlarm("Raw",t-30,n,"margin").AddAlarm("Raw",t,n,"").}
-
 set PRT to import("util/parts").
 set SYS to import("system").
 set MNV to import("maneuver").
 set ORB to import("orbmech").
 set RDV to import("rendezvous").
+
+function SetAlarm{parameter t,n.AddAlarm("Raw",t-30,n,"margin").AddAlarm("Raw",t,n,"").}
 
 lock NORMALVEC to VCRS(SHIP:VELOCITY:ORBIT,-BODY:POSITION).
 lock RADIALVEC TO VXCL(PROGRADE:VECTOR, UP:VECTOR).
@@ -211,7 +106,7 @@ function init{parameter m,p.
 		m["end"]().
 		return.
 	}
-	local launchWindow is getInclinedLaunchWindow(targetBody).
+	local launchWindow is RDV["inclinedLaunchWindow"](targetBody).
 	if launchWindow[0] - counter > TIME:seconds {
 		lock launchCountdown to launchWindow[0] - TIME:seconds.
 		set launchHeading to launchWindow[1].
@@ -279,12 +174,12 @@ function circularize{parameter m,p.
 	else if burnEta<=0 set throt to 1.
 }
 function calcTransferInclinationBurn{parameter m,p.
-	local relNodes is anomaly_of_relative_nodes(targetBody).
+	local relNodes is RDV["relativeNodes"](targetBody).
 	local whichNode is relNodes["next"].
 	local anomalyNextNode is relNodes[whichNode].
 	local altNextNode is ORB["Rt"](anomalyNextNode).
 	local etaNextNode is ORB["eta"](anomalyNextNode).
-	set dv to 2*MNV["VisViva"](sma, altNextNode)*SIN(relativeInclination(targetBody)/2).
+	set dv to 2*MNV["VisViva"](sma, altNextNode)*SIN(RDV["relativeInclination"](targetBody)/2).
 	set preburn to MNV["GetManeuverTime"](dv/2).
 	set fullburn to MNV["GetManeuverTime"](dv).
 	if etaNextNode > preburn + 10 {
@@ -302,7 +197,7 @@ function transferInclinationBurn{parameter m,p.
 	else lock STEERING to orient.
 	if burnEta > 0 return.
 
-	local theta is round(relativeInclination(targetBody),4).
+	local theta is round(RDV["relativeInclination"](targetBody),4).
 	if throt > 0 {
 		if theta < maxRelativeInclination {
 			set throt to 0.
@@ -320,8 +215,8 @@ function calcMinmusTransfer{parameter m,p.
 	set dv to MNV["ChangeApDeltaV"](targetBody:altitude).
 	set preburn to MNV["GetManeuverTime"](dv/2).
 	set fullburn to MNV["GetManeuverTime"](dv).
-	local transferAnomaly is RDV["VTransferCirc"](0, targetBody).
-	local etaTransfer is RDV["etaTransferCirc"](transferAnomaly, targetBody).
+	local transferAnomaly is RDV["transferAnomalyCirc"](0, targetBody).
+	local etaTransfer is RDV["transferEtaCirc"](transferAnomaly, targetBody).
 	lock STEERING to orient.
 	if munOccludesMinmusTransfers() return.
 	if etaTransfer < preburn + 10 return.
@@ -478,8 +373,8 @@ function calcTransfer{parameter m,p.
 
 	local etaTransfer is ETA:periapsis.
 	if satID>0 {
-		local transfer_anomaly is RDV["VTransferCirc"](separation_angle).
-		set etaTransfer to RDV["etaTransferCirc"](transfer_anomaly).
+		local transfer_anomaly is RDV["transferAnomalyCirc"](separation_angle).
+		set etaTransfer to RDV["transferEtaCirc"](transfer_anomaly).
 	}
 	if etaTransfer > preburn + 10 {
 		set burnTime to tIME:seconds + etaTransfer - preburn.

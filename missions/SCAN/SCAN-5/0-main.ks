@@ -120,8 +120,8 @@ function circularize{parameter m,p.
 function calcMunTransfer{parameter m,p.
 	set dv to MNV["ChangeApDeltaV"](Mun:altitude).
 	set preburn to MNV["GetManeuverTime"](dv/2).
-	local transferAnomaly is RDV["VTransferCirc"](0, Mun).
-	local etaTransfer is RDV["etaTransferCirc"](transferAnomaly, Mun).
+	local transferAnomaly is RDV["transferAnomalyCirc"](0, Mun).
+	local etaTransfer is RDV["transferEtaCirc"](transferAnomaly, Mun).
 	if etaTransfer - preburn > 0 {
 		set TARGET to Mun.
 		set burnTime to TIME:seconds + etaTransfer - preburn.

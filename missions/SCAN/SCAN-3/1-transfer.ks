@@ -35,8 +35,8 @@ function calc_xfer_burn{parameter m,p.
 	set dv to MNV["ChangeApDeltaV"](targetAp).
 	set preburn to MNV["GetManeuverTime"](dv/2).
 	set fullburn to MNV["GetManeuverTime"](dv).
-	local transfer_anomaly to RDV["VTransferCirc"](0, Minmus).
-	set node_time to TIME:seconds + RDV["etaTransferCirc"](transfer_anomaly, Minmus).
+	local transfer_anomaly to RDV["transferAnomalyCirc"](0, Minmus).
+	set node_time to TIME:seconds + RDV["transferEtaCirc"](transfer_anomaly, Minmus).
 
 	print "xfer burn: "+round(dv,2)+"m/s in "+round(fullburn,2)+"s ("+round(preburn,2)+"s)" at (0,0).
 	m["next"]().

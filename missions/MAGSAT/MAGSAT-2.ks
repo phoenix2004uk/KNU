@@ -108,8 +108,8 @@ function calcTransfer{parameter m,p.
 	partLib["DoPartModuleAction"]("longAntenna","ModuleRTAntenna","deactivate").
 	set dv to MNV["ChangeApDeltaV"](Mun:altitude).
 	set preburn to MNV["GetManeuverTime"](dv/2).
-	local transferAnomaly to RDV["VTransferCirc"](0, Mun).
-	set burnTime to TIME:seconds + RDV["etaTransferCirc"](transferAnomaly, Mun)-preburn.
+	local transferAnomaly to RDV["transferAnomalyCirc"](0, Mun).
+	set burnTime to TIME:seconds + RDV["transferEtaCirc"](transferAnomaly, Mun)-preburn.
 	AddAlarm("Raw",burnTime,"transfer","").
 	m["next"]().
 }

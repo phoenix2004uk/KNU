@@ -67,8 +67,8 @@ function calc_xfer_burn{parameter m,p.
 	m["next"]().
 }
 function align_xfer_burn{parameter m,p.
-	local transfer_anomaly to RDV["VTransferCirc"](separation_angle).
-	set node_time to TIME:seconds + RDV["etaTransferCirc"](transfer_anomaly).
+	local transfer_anomaly to RDV["transferAnomalyCirc"](separation_angle).
+	set node_time to TIME:seconds + RDV["transferEtaCirc"](transfer_anomaly).
 
 	m["next"]().
 }

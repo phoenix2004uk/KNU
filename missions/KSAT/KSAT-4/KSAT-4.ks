@@ -129,8 +129,8 @@ function calcTransfer{parameter m,p.
 	set preburn to MNV["GetManeuverTime"](dv/2).
 	if isFirst set burnTime to TIME:seconds + ETA:periapsis-preburn.
 	else {
-		local transfer_anomaly to RDV["VTransferCirc"](separation_angle).
-		set burnTime to TIME:seconds + RDV["etaTransferCirc"](transfer_anomaly)-preburn.
+		local transfer_anomaly to RDV["transferAnomalyCirc"](separation_angle).
+		set burnTime to TIME:seconds + RDV["transferEtaCirc"](transfer_anomaly)-preburn.
 	}
 	AddAlarm("Raw",burnTime,"transfer","").
 	m["next"]().
