@@ -1,0 +1,1 @@
+{export(Lex("version","1.0.0","normal",{return VCRS(SHIP:VELOCITY:ORBIT,-BODY:POSITION).},"radial",{return VXCL(PROGRADE:VECTOR,UP:VECTOR).},"sun",{parameter A is V(0,1,0). return LOOKDIRUP(A,SUN:position).})).}

@@ -1,108 +1,122 @@
-CLEARSCREEN.
+set SYS to import("system").
+set MNV to import("maneuver").
+set ASC to import("ascent").
+set ORD to import("ordinal").
 
-// imports
-LOCAL partLib IS import("util/parts").
-LOCAL SYS IS import("system").
-LOCAL MNV IS import("maneuver").
+local launchAlt is 100e3.
+local launchHeading is 90.
+local launchCountdown is 10.
+local launchProfile is ASC["defaultProfile"].
+local orbitStage is 0.
+local insertionStage is 1.
 
-LOCAL countdown IS 10.
+lock orient to ORD["sun"]().
+lock steer to orient.
+lock STEERING to steer.
+set throt to 0.
+lock THROTTLE to throt.
+local dv is 0.
+local burnTime is 0.
+lock burnEta to burnTime - TIME:seconds.
+lock Ap to ALT:apoapsis.
+lock Pe to ALT:periapsis.
+lock sma to SHIP:OBT:semiMajorAxis.
+lock inc to SHIP:OBT:inclination.
+lock ecc to SHIP:OBT:eccentricity.
 
-LOCAL RT IS Lex(
-	"on", {PARAMETER name,dishTarget IS 0.
-		partLib["DoPartModuleEvent"](name,"ModuleRTAntenna","activate").
-		IF dishTarget partLib["SetPartModuleField"](name,"ModuleRTAntenna","target",dishTarget).
-	},
-	"off", {PARAMETER name.
-		partLib["DoPartModuleAction"](name,"ModuleRTAntenna","deactivate").
-	}
+set steps to Lex(
+0,prelaunch@,
+1,countdown@,
+2,launch@,
+2.1,ascentWithBoosters@,
+2.2,ascent@,
+2.3,coastToSpace@,
+2.4,inspace@,
+2.5,calcInsertion@,
+2.6,insertion@,
+2.7,calcCircularize@,
+2.8,circularize@
 ).
 
-SET events TO Lex(
-"powersave_on", {PARAMETER mission, public.
-	IF SHIP:ELECTRICCHARGE < 200 {
-		Notify("Power Saving Mode").
-		RT["off"]("mediumDishAntenna").
-		mission["enable"]("powersave_off").
-		mission["disable"]("powersave_on").
+function prelaunch {parameter m,p.
+	set SHIP:CONTROL:pilotMainThrottle to 0.
+	set throt to 0.
+	lock steer to HEADING(launchHeading, ASC["pitchTarget"](launchProfile)) + R(0,0,ASC["rollTarget"](launchProfile)).
+	m["next"]().
+}
+function countdown{parameter m,p.
+	if launchCountdown = 0 {
+		Notify("Launch").
+		m["next"]().
 	}
-},
-"powersave_off", {PARAMETER mission, public.
-	IF SHIP:ELECTRICCHARGE > 1000 {
-		Notify("Power Restored").
-		RT["on"]("mediumDishAntenna").
-		mission["enable"]("powersave_on").
-		mission["disable"]("powersave_off").
+	else {
+		Notify("T-"+launchCountdown).
+		set launchCountdown to launchCountdown - 1.
+		wait 1.
 	}
-}).
-SET active TO 0.
-
-SET steps TO Lex(
-"countdown", {PARAMETER mission, public.
-	IF countdown > 0 {
-		Notify("Launching in T-"+ROUND(countdown,0)).
-		SET countdown TO countdown - 1.
-		WAIT 1.
+}
+function launch{parameter m,p.
+	set throt to 1.
+	UNTIL SHIP:availableThrust > 1 SYS["SafeStage"]().
+	m["next"]().
+}
+function ascentWithBoosters{parameter m,p.
+	if SYS["Burnout"]() {
+		set launchProfile["a0"] to ALTITUDE.
+		SYS["SafeStage"]().
+		m["next"]().
 	}
-	ELSE {
-		Notify("T-0 Lift Off").
-		SET asc TO import("prg/asc")["new"](Lex("heading", 90, "lastStage", 1, "alt", 150000)).
-		mission["next"]().
+	else if STAGE:solidFuel = 0 m["next"]().
+}
+function ascent{parameters m,p.
+	SYS["Burnout"](TRUE, orbitStage).
+	if ALT:APOAPSIS > launchAlt {
+		set throt to 0.
+		WAIT 1. UNTIL STAGE:NUMBER=insertionStage SYS["SafeStage"]().
+		m["next"]().
 	}
-},
-"ascent", {PARAMETER mission, public.
-	IF asc() {
-		purge("prg/asc").
-		mission["next"]().
+}
+function coastToSpace{parameters m,p.
+	if ALTITUDE > BODY:ATM:height {
+		m["next"]().
 	}
-},
-"inspace", {PARAMETER mission, public.
-	Notify("Reached Space").
-	RT["on"]("mediumDishAntenna","Mission Control").
+}
+function inspace{parameter m,p.
 	PANELS ON.
-
-	LOCAL dV_insertion IS MNV["ChangePeDeltaV"](15000).
-	LOCAL insertion_burntime IS MNV["GetManeuverTime"](dV_insertion).
-	ADD NODE(TIME:SECONDS + ETA:APOAPSIS - insertion_burntime - 10, 0, 0, dV_insertion).
-
-	mission["enable"]("powersave_on").
-
-	IF NEXTNODE:ETA > 60 {
-		WARPTO(TIME:SECONDS + NEXTNODE:ETA - 30).
+	LIGHTS ON.
+	lock steer to PROGRADE+R(0,0,0).
+	m["next"]().
+}
+function calcInsertion{parameter m,p.
+	set dv to MNV["ChangePeDeltaV"](15000).
+	set preburn to MNV["GetManeuverTime"](dv/2).
+	set fullburn to MNV["GetManeuverTime"](dv).
+	set burnTime to TIME:seconds + ETA:apoapsis - fullburn.
+	SetAlarm(burnTime,"insertion").
+	m["next"]().
+}
+function insertion{parameter m,p.
+	if Pe >= 15000 {
+		set throt to 0.
+		WAIT 1. UNTIL STAGE:NUMBER=orbitStage SYS["SafeStage"]().
+		m["next"]().
 	}
-
-	mission["next"]().
-},
-"coast", {PARAMETER mission, public.
-	IF NEXTNODE:ETA < 30 {
-		MNV["Steer"](NEXTNODE:BURNVECTOR).
+	else if burnEta<=0 set throt to 1.
+}
+function calcCircularize{parameter m,p.
+	set dv to MNV["ChangePeDeltaV"](Ap).
+	set preburn to MNV["GetManeuverTime"](dv/2).
+	set fullburn to MNV["GetManeuverTime"](dv).
+	if ETA:apoapsis > preburn and ETA:apoapsis < ETA:periapsis
+		set burnTime to TIME:seconds + ETA:apoapsis - preburn.
+	else set burnTime to TIME:seconds + 5.
+	SetAlarm(burnTime,"circularize").
+	m["next"]().
+}
+function circularize{parameter m,p.
+	if Pe > BODY:ATM:height and burnEta + fullburn <= 0 {
+		set throt to 0.
+		m["next"]().
 	}
-	IF NEXTNODE:ETA <= 0 {
-		mission["next"]().
-	}
-},
-"insertion", {PARAMETER mission, public.
-	LOCK STEERING TO PROGRADE.
-	IF ALT:PERIAPSIS < 15000 {
-		LOCK THROTTLE TO 1.
-	}
-	ELSE {
-		LOCK THROTTLE TO 0.
-		REMOVE NEXTNODE.
-		mission["next"]().
-	}
-},
-"drop_stage", {PARAMETER mission, public.
-	Notify("Dropping Ascent Stage").
-
-	WAIT 0.5.
-	UNTIL STAGE:NUMBER = 1 SYS["SafeStage"]().
-	WAIT 2.
-	mission["next"]().
-	SET circ TO import("prg/circ")["new"]("ap").
-},
-"circularize", {PARAMETER mission, public.
-	IF circ() {
-		purge("prg/circ").
-		mission["next"]().
-	}
-}).
+	else if burnEta<=0 set throt to 1.
+}
