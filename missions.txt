@@ -50,14 +50,21 @@ SCAN 4-6
   - SCAN-5 GeoEye II - Mun BIOME
   - SCAN-6 GeoEye III - Minmus BIOME
 ======================================================================================
-PIONEER-9
-- suicide burn and hover testing program
+
+*** system refactoring ***
+- remove ascent program and incorporate into standard launching script
+- craete ascent and descent libraries for required functions
+- preparations for PIONEER 9 & 10 test flights, and RANGER 3 & 4 missions
+
+PIONEER 9&10
+- PIONEER-9 suicide burn and hover testing program
+- PIONEER-10 seeking a "flat" landing site
 ======================================================================================
 RANGER 3-4
 - RANGER-3 Mun Landing
 - RANGER-4 Minmus Landing
 
-PIONEER-10
+PIONEER-11
 - powered landing tests at a targetted location
 ======================================================================================
 *** Begin Manned Program ***
@@ -73,10 +80,10 @@ RANGER 5-6
 - RANGER-5 Mun Landing (Targeted)
 - RANGER-6 Minmus Landing (Targeted)
 
-PIONEER 11-13
-- PIONEER-11 dummy target drone launched into LKO
-- PIONEER-12 orbital rendezvous in LKO with PIONEER-11
-- PIONEER-13 orbital rendezvous docking in LKO
+PIONEER 12-14
+- PIONEER-12 dummy target drone launched into LKO
+- PIONEER-13 orbital rendezvous in LKO with PIONEER-11
+- PIONEER-14 orbital rendezvous docking in LKO
 ======================================================================================
 
 KSS
