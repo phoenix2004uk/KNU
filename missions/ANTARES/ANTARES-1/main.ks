@@ -19,7 +19,12 @@ set steps to Lex(
 5,	done@
 ).
 
+local lastSpeed is 0.
 function deployChutes{parameter m,p.
+	if SHIP:verticalSpeed < lastSpeed {
+		set lastSpeed to SHIP:verticalSpeed.
+		return.
+	}
 	if STAGE:number > 0 and SHIP:velocity:surface:mag < 250 and SHIP:verticalSpeed < 0 {
 		until STAGE:number = 0 SYS["SafeStage"]().
 	}
@@ -37,9 +42,11 @@ function ascent{parameter m,p.
 	if SYS["burnout"](TRUE) m["next"]().
 }
 function doScience{parameter m,p.
-	SCI["run"]["science.module"](FALSE).
-	SCI["run"]["GooExperiment"](FALSE,0).
-	m["next"]().
+	if ALTITUDE < 18000 {
+		SCI["run"]["science.module"](FALSE).
+		SCI["run"]["GooExperiment"](FALSE,0).
+		m["next"]().
+	}
 }
 function triggerAbort{parameter m,p.
 	m["enable"]("abort").
