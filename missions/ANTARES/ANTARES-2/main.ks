@@ -7,6 +7,7 @@ local launchProfile is ASC["defaultProfile"].
 local counter is 10.
 local launchCountdown is counter.
 local launchHeading is 90.
+local letAbort is FALSE.
 
 lock steer to UP.
 lock STEERING to steer.
@@ -15,13 +16,12 @@ lock THROTTLE to throt.
 
 // setup abort procedure
 ON ABORT {
-	main["enable"]("abort").
+	set letAbort to TRUE.
 }
 
 set events to Lex(
 	"abort", deployChutes@
 ).
-set active to 0.
 set steps to Lex(
 0,	prelaunch@,
 1,	countdown@,
@@ -36,6 +36,7 @@ set steps to Lex(
 
 local lastSpeed is 0.
 function deployChutes{parameter m,p.
+	if not letAbort return.
 	if SHIP:verticalSpeed < lastSpeed {
 		set lastSpeed to SHIP:verticalSpeed.
 		return.
@@ -49,7 +50,6 @@ function deployChutes{parameter m,p.
 		unlock STEERING.
 	}
 }
-
 
 function prelaunch {parameter m,p.
 	set SHIP:CONTROL:pilotMainThrottle to 0.
@@ -86,7 +86,7 @@ function ascentWithBoosters{parameter m,p.
 function ascent{parameter m,p.
 	SYS["Burnout"](TRUE, 2).
 	lock THROTTLE to throt.
-	if SHIP:parts:length < 16 or SHIP:LiquidFuel = 0 m["next"]().
+	if letAbort m["next"]().
 }
 function doScience{parameter m,p.
 	if ALTITUDE > 20000 or ALT:apoapsis < 20000 {
@@ -101,7 +101,7 @@ function triggerAbort{parameter m,p.
 	m["next"]().
 }
 function land{parameter m,p.
-	if STATUS = "LANDED" {
+	if STATUS = "LANDED" or STATUS = "SPLASHED" {
 		m["next"]().
 	}
 }
