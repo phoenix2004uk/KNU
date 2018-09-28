@@ -2,10 +2,12 @@ set SYS to import("system").
 set MNV to import("maneuver").
 set ASC to import("ascent").
 set ORD to import("ordinal").
+set TLM to import("telemetry").
 
 local launchAlt is 100e3.
 local launchHeading is 90.
-local launchCountdown is 10.
+local counter is 10.
+local launchCountdown is counter.
 local launchProfile is ASC["defaultProfile"].
 local orbitStage is 0.
 local insertionStage is 1.
@@ -45,38 +47,42 @@ function prelaunch {parameter m,p.
 	m["next"]().
 }
 function countdown{parameter m,p.
-	if launchCountdown = 0 {
-		Notify("Launch").
-		m["next"]().
-	}
-	else {
-		Notify("T-"+launchCountdown).
-		set launchCountdown to launchCountdown - 1.
-		wait 1.
+	if round(launchCountdown) <= 10 {
+		if counter <= 0 {
+			Notify("Launch").
+			m["next"]().
+		}
+		else {
+			Notify("T-"+counter).
+			set counter to counter - 1.
+			wait 1.
+		}
 	}
 }
 function launch{parameter m,p.
-	set throt to 1.
+	lock throt to TLM["constantTWR"](2).
 	UNTIL SHIP:availableThrust > 1 SYS["SafeStage"]().
 	m["next"]().
 }
 function ascentWithBoosters{parameter m,p.
 	if SYS["Burnout"]() {
-		set launchProfile["a0"] to ALTITUDE.
-		SYS["SafeStage"]().
+		STAGE.
 		m["next"]().
 	}
 	else if STAGE:solidFuel = 0 m["next"]().
+	else set launchProfile["a0"] to ALTITUDE.
 }
-function ascent{parameters m,p.
+function ascent{parameter m,p.
 	SYS["Burnout"](TRUE, orbitStage).
-	if ALT:APOAPSIS > launchAlt {
+	lock THROTTLE to throt.
+	if Ap > launchAlt {
 		set throt to 0.
 		WAIT 1. UNTIL STAGE:NUMBER=insertionStage SYS["SafeStage"]().
 		m["next"]().
 	}
+	else if ALTITUDE > BODY:ATM:height / 2 set throt to 1.
 }
-function coastToSpace{parameters m,p.
+function coastToSpace{parameter m,p.
 	if ALTITUDE > BODY:ATM:height {
 		m["next"]().
 	}

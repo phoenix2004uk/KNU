@@ -15,7 +15,7 @@
 		return -90 + MIN(90,MAX(0,90*(ALTITUDE-launchProfile["r0"])/launchProfile["rN"])).
 	}
 	export(Lex(
-		"version", "1.0.0",
+		"version", "2.0.0",
 		"pitchTarget", GetPitchTarget@,
 		"rollTarget", GetRollTarget@,
 		"defaultProfile", Lex(
