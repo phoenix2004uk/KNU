@@ -43,13 +43,13 @@
 	LOCAL DoModuleEvent IS {
 		PARAMETER moduleName, eventName.
 		FOR module IN SHIP:MODULESNAMED(moduleName) {
-			IF module:HASEVENT(eventName) module:DoEvent(eventName).
+			IF module:part:ship=SHIP and module:HASEVENT(eventName) module:DoEvent(eventName).
 		}
 	}.
 	LOCAL DoModuleAction IS {
 		PARAMETER moduleName, actionName, actionValue IS TRUE.
 		FOR module IN SHIP:MODULESNAMED(moduleName) {
-			IF module:HASACTION(actionName) module:DoAction(actionName, actionValue).
+			IF module:part:ship=SHIP and module:HASACTION(actionName) module:DoAction(actionName, actionValue).
 		}
 	}.
 
