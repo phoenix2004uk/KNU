@@ -27,17 +27,17 @@ lock inc to SHIP:OBT:inclination.
 lock ecc to SHIP:OBT:eccentricity.
 
 set steps to Lex(
-0,prelaunch@,
-1,countdown@,
-2,launch@,
-2.1,ascentWithBoosters@,
-2.2,ascent@,
-2.3,coastToSpace@,
-2.4,inspace@,
-2.5,calcInsertion@,
-2.6,insertion@,
-2.7,calcCircularize@,
-2.8,circularize@
+0,	prelaunch@,
+1,	countdown@,
+2,	launch@,
+3,	ascentWithBoosters@,
+4,	ascent@,
+5,	coastToSpace@,
+6,	inspace@,
+7,	calcInsertion@,
+8,	insertion@,
+9,	calcCircularize@,
+10,	circularize@
 ).
 
 function prelaunch {parameter m,p.
@@ -77,7 +77,7 @@ function ascent{parameter m,p.
 	lock THROTTLE to throt.
 	if Ap > launchAlt {
 		set throt to 0.
-		WAIT 1. UNTIL STAGE:NUMBER=insertionStage SYS["SafeStage"]().
+		WAIT 1. UNTIL STAGE:NUMBER<=insertionStage SYS["SafeStage"]().
 		m["next"]().
 	}
 	else if ALTITUDE > BODY:ATM:height / 2 set throt to 1.

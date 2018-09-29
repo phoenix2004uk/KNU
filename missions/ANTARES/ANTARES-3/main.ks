@@ -32,20 +32,22 @@ lock inc to SHIP:OBT:inclination.
 lock ecc to SHIP:OBT:eccentricity.
 
 local abortModes is Lex(
-"FLYING", abortAscent@,
-"SUBORBITAL", abortAscent@,
-"ORBITAL", abortOrbital@
+"PRELAUNCH", abortAscentKerbin@,
+"FLYING", abortAscentKerbin@,
+"SUBORBITAL", abortAscentKerbin@,
+"ORBITAL", abortOrbitalKerbin@
 ).
 
-function abortAscent {parameter m.
+function abortAscentKerbin {parameter m.
 	lock THROTTLE to 0.
+	wait 0.
 	PRT["DoModuleEvent"]("ModuleDecouple", "decouple").
 	PRT["DoModuleEvent"]("ModuleEngines", "activate engine").
 	wait 10.
 	lock STEERING to srfRetrograde.
 	prepareForLanding(m).
 }
-function abortOrbital {parameter m.
+function abortOrbitalKerbin {parameter m.
 	lock THROTTLE to 0.
 	lock STEERING to RETROGRADE.
 	wait 10.
@@ -58,9 +60,14 @@ function abortOrbital {parameter m.
 function prepareForLanding{parameter m.
 	wait until SHIP:verticalSpeed < 0.
 	local lastSpeed is 0.
-	until SHIP:verticalSpeed > lastSpeed {set lastSpeed to SHIP:verticalSpeed. wait 1.}
-	wait until SHIP:velocity:surface:mag < 250 or ALT:RADAR < 3000.
-	PRT["DoModuleAction"]("RealChuteModule", "arm parachute").
+	if ALT:RADAR < 3000 {
+		PRT["DoModuleAction"]("RealChuteModule", "deploy chute").
+	}
+	else {
+		until SHIP:verticalSpeed > lastSpeed {set lastSpeed to SHIP:verticalSpeed. wait 1.}
+		wait until SHIP:velocity:surface:mag < 250 or ALT:RADAR < 3000.
+		PRT["DoModuleAction"]("RealChuteModule", "arm parachute").
+	}
 	PRT["DoModuleEvent"]("ModuleDecouple", "jettison heat shield").
 	wait until ALT:RADAR < 500.
 	GEAR ON.
@@ -121,7 +128,7 @@ function ascent{parameter m,p.
 	lock THROTTLE to throt.
 	if Ap > launchAlt {
 		set throt to 0.
-		WAIT 1. UNTIL STAGE:NUMBER=insertionStage SYS["SafeStage"]().
+		WAIT 1. UNTIL STAGE:NUMBER<=insertionStage SYS["SafeStage"]().
 		m["next"]().
 	}
 	else if ALTITUDE > BODY:ATM:height / 2 set throt to 1.
