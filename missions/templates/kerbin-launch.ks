@@ -62,14 +62,14 @@ function countdown{parameter m,p.
 function launch{parameter m,p.
 	lock throt to TLM["constantTWR"](2).
 	UNTIL SHIP:availableThrust > 1 SYS["SafeStage"]().
-	m["next"]().
+	if STAGE:solidFuel = 0 m["jump"](2).
+	else m["next"]().
 }
 function ascentWithBoosters{parameter m,p.
 	if SYS["Burnout"]() {
-		STAGE.
+		SYS["SafeStage"]().
 		m["next"]().
 	}
-	else if STAGE:solidFuel = 0 m["next"]().
 	else set launchProfile["a0"] to ALTITUDE.
 }
 function ascent{parameter m,p.
