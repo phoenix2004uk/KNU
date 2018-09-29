@@ -4,7 +4,11 @@ set ASC to import("ascent").
 set ORD to import("ordinal").
 set TLM to import("telemetry").
 set PRT to import("util/parts").
-function SetAlarm{parameter t,n.AddAlarm("Raw",t-30,n,"margin").AddAlarm("Raw",t,n,"").}
+function SetAlarm{parameter t,n.AddAlarm("Raw",t-30,n+" margin","").AddAlarm("Raw",t,n,"").}
+function EtaAlarm{parameter n.
+	for alarm in ListAlarms("All") if alarm:name = n return alarm:remaining.
+	return -1.
+}
 
 wait until SHIP=KUNIVERSE:activeVessel.
 wait until SHIP:unpacked.
@@ -14,8 +18,9 @@ local launchHeading is 90.
 local counter is 10.
 local launchCountdown is counter.
 local launchProfile is ASC["defaultProfile"].
-local orbitStage is 3.
 local insertionStage is 4.
+local orbitStage is 3.
+local chuteStage is 1.
 
 lock orient to ORD["sun"]().
 lock steer to orient.
@@ -34,8 +39,7 @@ lock ecc to SHIP:OBT:eccentricity.
 local abortModes is Lex(
 "PRELAUNCH", abortAscentKerbin@,
 "FLYING", abortAscentKerbin@,
-"SUBORBITAL", abortAscentKerbin@,
-"ORBITAL", abortOrbitalKerbin@
+"SUBORBITAL", abortAscentKerbin@
 ).
 
 function abortAscentKerbin {parameter m.
@@ -45,19 +49,6 @@ function abortAscentKerbin {parameter m.
 	PRT["DoModuleEvent"]("ModuleEngines", "activate engine").
 	wait 10.
 	lock STEERING to srfRetrograde.
-	prepareForLanding(m).
-}
-function abortOrbitalKerbin {parameter m.
-	lock THROTTLE to 0.
-	lock STEERING to RETROGRADE.
-	wait 10.
-	lock THROTTLE to 1.
-	wait UNTIL ALT:periapsis < 25000.
-	lock THROTTLE to 0.
-	lock STEERING to srfRetrograde.
-	prepareForLanding(m).
-}
-function prepareForLanding{parameter m.
 	wait until SHIP:verticalSpeed < 0.
 	local lastSpeed is 0.
 	if ALT:RADAR < 3000 {
@@ -96,7 +87,10 @@ set steps to Lex(
 8,	insertion@,
 9,	calcCircularize@,
 10,	circularize@,
-11, landed@
+11,	startOrbits@,
+12,	finishOrbits@,
+13,	deorbit@,
+14, landed@
 ).
 
 function prelaunch {parameter m,p.
@@ -121,14 +115,14 @@ function countdown{parameter m,p.
 function launch{parameter m,p.
 	lock throt to TLM["constantTWR"](2).
 	UNTIL SHIP:availableThrust > 1 SYS["SafeStage"]().
-	m["next"]().
+	if STAGE:solidFuel = 0 m["jump"](2).
+	else m["next"]().
 }
 function ascentWithBoosters{parameter m,p.
 	if SYS["Burnout"]() {
-		STAGE.
+		SYS["SafeStage"]().
 		m["next"]().
 	}
-	else if STAGE:solidFuel = 0 m["next"]().
 	else set launchProfile["a0"] to ALTITUDE.
 }
 function ascent{parameter m,p.
@@ -185,6 +179,31 @@ function circularize{parameter m,p.
 	}
 	else if burnEta<=0 set throt to 1.
 }
+function startOrbits{parameter m,p.
+	SetAlarm(TIME:seconds + 72*60*60,"72hr").
+	m["next"]().
+}
+function finishOrbits{parameter m,p.
+	if EtaAlarm("72hr") < 0 m["next"]().
+}
+function deorbit{parameter m,p.
+	lock steer to RETROGRADE.
+	wait 10.
+	set throt to 1.
+	wait until Pe < 25000.
+	set throt to 0.
+	lock steer to srfRetrograde.
+	wait until ALTITUDE < BODY:ATM:height.
+	UNTIL STAGE:NUMBER=chuteStage SYS["SafeStage"]().
+	PANELS OFF.
+	wait until ALT:RADAR < 500.
+	GEAR ON.
+	unlock STEERING.
+	m["next"]().
+}
 function landed{parameter m,p.
-	if STATUS = "LANDED" or STATUS = "SPLASHED" m["next"]().
+	if STATUS = "LANDED" or STATUS = "SPLASHED" {
+		SAS ON.
+		m["next"]().
+	}
 }
